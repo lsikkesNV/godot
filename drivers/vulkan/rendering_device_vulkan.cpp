@@ -8668,6 +8668,10 @@ void RenderingDeviceVulkan::sync() {
 	local_device_processing = false;
 }
 
+void RenderingDeviceVulkan::emit_marker(MarkerType marker) {
+	context->streamline_emit(marker);
+}
+
 VmaPool RenderingDeviceVulkan::_find_or_create_small_allocs_pool(uint32_t p_mem_type_index) {
 	if (small_allocs_pools.has(p_mem_type_index)) {
 		return small_allocs_pools[p_mem_type_index];
@@ -9032,6 +9036,8 @@ void RenderingDeviceVulkan::initialize(VulkanContext *p_context, bool p_local_de
 	if (err != VK_SUCCESS) {
 		WARN_PRINT("vkCreatePipelinecache failed with error " + itos(err) + ".");
 	}
+
+	p_context->streamline_init_post_device();
 }
 
 void RenderingDeviceVulkan::_load_pipeline_cache() {

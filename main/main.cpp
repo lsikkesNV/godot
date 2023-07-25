@@ -3338,6 +3338,9 @@ bool Main::iteration() {
 	//for now do not error on this
 	//ERR_FAIL_COND_V(iterating, false);
 
+	if(RD::get_singleton())
+		RD::get_singleton()->emit_marker(RenderingDevice::BeginSimulation);
+
 	iterating++;
 
 	const uint64_t ticks = OS::get_singleton()->get_ticks_usec();
@@ -3436,6 +3439,9 @@ bool Main::iteration() {
 	}
 	message_queue->flush();
 
+	if(RD::get_singleton())
+		RD::get_singleton()->emit_marker(RenderingDevice::EndSimulation);
+
 	RenderingServer::get_singleton()->sync(); //sync if still drawing from previous frames.
 
 	if (DisplayServer::get_singleton()->can_any_window_draw() &&
@@ -3532,6 +3538,9 @@ bool Main::iteration() {
 		}
 	}
 #endif
+
+	if(RD::get_singleton())
+		RD::get_singleton()->emit_marker(RenderingDevice::BeforeMessageLoop);
 
 	return exit;
 }

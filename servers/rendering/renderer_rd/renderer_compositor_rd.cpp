@@ -99,10 +99,13 @@ void RendererCompositorRD::begin_frame(double frame_step) {
 
 	canvas->set_time(time);
 	scene->set_time(time, frame_step);
+
+	RD::get_singleton()->emit_marker(RenderingDevice::BeginRender);
 }
 
 void RendererCompositorRD::end_frame(bool p_swap_buffers) {
 	// TODO: Likely pass a bool to swap buffers to avoid display?
+	RD::get_singleton()->emit_marker(RenderingDevice::EndRender);
 	RD::get_singleton()->swap_buffers();
 }
 
@@ -314,7 +317,7 @@ RendererCompositorRD::RendererCompositorRD() {
 	} else if (rendering_method == "forward_plus") {
 		// default to our high end renderer
 		scene = memnew(RendererSceneRenderImplementation::RenderForwardClustered());
-	} else {
+	} else {	
 		ERR_FAIL_MSG("Cannot instantiate RenderingDevice-based renderer with renderer type " + rendering_method);
 	}
 

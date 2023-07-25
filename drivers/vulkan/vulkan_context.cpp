@@ -43,10 +43,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(USE_VOLK) && defined(USE_STREAMLINE) && defined(_WIN32)
+#include <windows.h>
+#endif
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 #define APP_SHORT_NAME "GodotEngine"
 
 VulkanHooks *VulkanContext::vulkan_hooks = nullptr;
+
+#include "vulkan_context_streamline.inl"
 
 Vector<VkAttachmentReference> VulkanContext::_convert_VkAttachmentReference2(uint32_t p_count, const VkAttachmentReference2 *p_refs) {
 	Vector<VkAttachmentReference> att_refs;
@@ -744,6 +750,8 @@ Error VulkanContext::_check_capabilities() {
 	storage_buffer_capabilities.storage_push_constant_16_is_supported = false;
 	storage_buffer_capabilities.storage_input_output_16 = false;
 
+	streamline_enumerate_capabilities();
+
 	if (is_instance_extension_enabled(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
 		// Check for extended features.
 		PFN_vkGetPhysicalDeviceFeatures2 vkGetPhysicalDeviceFeatures2_func = (PFN_vkGetPhysicalDeviceFeatures2)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceFeatures2");
@@ -1129,6 +1137,7 @@ Error VulkanContext::_create_instance() {
 				break;
 		}
 	}
+
 
 	return OK;
 }
@@ -2164,10 +2173,27 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 }
 
 Error VulkanContext::initialize() {
-#ifdef USE_VOLK
-	if (volkInitialize() != VK_SUCCESS) {
+	streamline_initialize();
+
+#if defined(USE_VOLK) && defined(USE_STREAMLINE) && defined(_WIN32)
+	HMODULE module;
+	module = LoadLibraryA("sl.interposer.dll");
+	if (!module) {
+		print_line("Vulkan: Could not load Streamline interposer. Falling back to default vulkan.");
+		module = LoadLibraryA("vulkan-1.dll");
+	}
+	if (!module) {
+		print_line("Vulkan: Could not load vulkan-1.dll. Failing.");
 		return FAILED;
 	}
+
+	// note: function pointer is cast through void function pointer to silence cast-function-type warning on gcc8
+	PFN_vkGetInstanceProcAddr vk_getInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(void(*)(void))GetProcAddress(module, "vkGetInstanceProcAddr");
+	volkInitializeCustom(vk_getInstanceProcAddr);
+#elif defined(USE_VOLK)
+	if (volkInitialize() != VK_SUCCESS) {
+		return FAILED;
+	}	
 #endif
 
 	Error err = _create_instance();
@@ -2489,7 +2515,11 @@ Error VulkanContext::swap_buffers() {
 	}
 #endif
 	//	print_line("current buffer:  " + itos(current_buffer));
+	streamline_emit(RenderingDevice::BeginPresent);
+
 	err = fpQueuePresentKHR(present_queue, &present);
+
+	streamline_emit(RenderingDevice::EndPresent);
 
 	frame_index += 1;
 	frame_index %= FRAME_LAG;

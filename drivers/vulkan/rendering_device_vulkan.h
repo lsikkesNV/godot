@@ -1254,6 +1254,8 @@ public:
 	virtual void submit(); // For local device.
 	virtual void sync(); // For local device.
 
+	virtual void emit_marker(MarkerType marker);
+
 	virtual uint32_t get_frame_delay() const;
 
 	virtual RenderingDevice *create_local_device();

@@ -1280,6 +1280,19 @@ public:
 	virtual void submit() = 0;
 	virtual void sync() = 0;
 
+	enum MarkerType	{
+		BeforeMessageLoop,
+		BeginSimulation,
+		EndSimulation,
+		BeginRender,
+		EndRender,
+		BeginPresent,
+		EndPresent,
+		PcPing
+	};
+
+	virtual void emit_marker(MarkerType marker) = 0;
+
 	enum MemoryType {
 		MEMORY_TEXTURES,
 		MEMORY_BUFFERS,

@@ -234,6 +234,8 @@ private:
 	uint64_t last_parsed_frame = UINT64_MAX;
 #endif
 
+	uint64_t last_ping_frame = UINT64_MAX;
+
 	friend class DisplayServer;
 
 	static void (*set_mouse_mode_func)(MouseMode);
@@ -328,6 +330,7 @@ public:
 	void remove_joy_mapping(String p_guid);
 
 	int get_unused_joy_id();
+	unsigned long long get_last_ping_frame();
 
 	bool is_joy_known(int p_device);
 	String get_joy_guid(int p_device) const;

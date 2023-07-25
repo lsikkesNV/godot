@@ -3925,7 +3925,7 @@ void DisplayServerWindows::_process_key_events() {
 						k->set_alt_pressed(false);
 						k->set_ctrl_pressed(false);
 					}
-
+ 
 					Input::get_singleton()->parse_input_event(k);
 				} else {
 					// Do nothing.

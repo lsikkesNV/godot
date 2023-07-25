@@ -511,6 +511,8 @@ void Input::_parse_input_event_impl(const Ref<InputEvent> &p_event, bool p_is_em
 	Ref<InputEventKey> k = p_event;
 	if (k.is_valid() && !k->is_echo() && k->get_keycode() != Key::NONE) {
 		if (k->is_pressed()) {
+			if(k->get_keycode() == Key::F13)
+				last_ping_frame = Engine::get_singleton()->get_process_frames();
 			keys_pressed.insert(k->get_keycode());
 		} else {
 			keys_pressed.erase(k->get_keycode());
@@ -1524,6 +1526,11 @@ int Input::get_unused_joy_id() {
 	}
 	return -1;
 }
+
+unsigned long long Input::get_last_ping_frame() {
+	return last_ping_frame;
+}
+
 
 Input::Input() {
 	singleton = this;

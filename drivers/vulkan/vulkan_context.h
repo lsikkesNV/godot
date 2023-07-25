@@ -93,6 +93,12 @@ public:
 		bool storage_input_output_16;
 	};
 
+	struct StreamlineCapabilities {
+		bool dlssAvailable = false;
+		bool dlssGAvailable = false;
+		bool reflexAvailable = false;
+	};
+
 private:
 	enum {
 		MAX_EXTENSIONS = 128,
@@ -110,12 +116,15 @@ private:
 	bool device_initialized = false;
 	bool inst_initialized = false;
 
+	void* streamline_framemarker = nullptr;
+
 	uint32_t instance_api_version = VK_API_VERSION_1_0;
 	SubgroupCapabilities subgroup_capabilities;
 	MultiviewCapabilities multiview_capabilities;
 	VRSCapabilities vrs_capabilities;
 	ShaderCapabilities shader_capabilities;
 	StorageBufferCapabilities storage_buffer_capabilities;
+	StreamlineCapabilities streamline_capabilities;
 
 	String device_vendor;
 	String device_name;
@@ -339,6 +348,11 @@ public:
 
 	void set_vsync_mode(DisplayServer::WindowID p_window, DisplayServer::VSyncMode p_mode);
 	DisplayServer::VSyncMode get_vsync_mode(DisplayServer::WindowID p_window = 0) const;
+
+	void streamline_initialize();
+	void streamline_enumerate_capabilities();
+	void streamline_emit(RenderingDevice::MarkerType marker);
+	void streamline_init_post_device();
 
 	VulkanContext();
 	virtual ~VulkanContext();
