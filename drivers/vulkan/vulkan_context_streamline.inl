@@ -4,6 +4,7 @@
 #include <sl_dlss.h>
 #include <sl_dlss_g.h>
 #include <sl_reflex.h>
+#include "vulkan_context.h"
 
 class StreamlineContext
 {
@@ -16,6 +17,7 @@ public:
 
 	// Reflex
 	sl::ReflexOptions reflex_options;
+	bool reflex_options_dirty = true;
 	PFun_slReflexGetState* slReflexGetState = nullptr;
 	PFun_slReflexSetOptions* slReflexSetOptions = nullptr;
 	PFun_slReflexSetMarker* slReflexSetMarker = nullptr;
@@ -67,6 +69,7 @@ VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhy
 
 void StreamlineContext::reflex_set_options(const sl::ReflexOptions& opts) {
 	reflex_options = opts;
+	reflex_options_dirty = false;
 	sl::Result result = this->slReflexSetOptions ? this->slReflexSetOptions(opts) : sl::Result::eOk;
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 }
@@ -145,7 +148,7 @@ const char* StreamlineContext::result_to_string(sl::Result result) {
 #endif
 
 void VulkanContext::streamline_initialize() {
-#ifdef USE_STREAMLINE
+#if USE_STREAMLINE
 	if(gStreamline.slInit != nullptr)
 		return; // already initialized.
 
@@ -175,7 +178,7 @@ void VulkanContext::streamline_initialize() {
 }
 
 void VulkanContext::streamline_enumerate_capabilities() {
-#ifdef USE_STREAMLINE
+#if USE_STREAMLINE
 	if(gStreamline.slInit == nullptr)
 		return; // not initialized. skip.
 
@@ -184,22 +187,59 @@ void VulkanContext::streamline_enumerate_capabilities() {
 }
 
 void VulkanContext::streamline_init_post_device() {
-#ifdef USE_STREAMLINE
+#if USE_STREAMLINE
 	if(streamline_capabilities.reflexAvailable)
 	{
 		sl::ReflexOptions reflex_options = {};
 		reflex_options.frameLimitUs = 0;
 		reflex_options.virtualKey = 0x7C; // VK_F13;
-		reflex_options.mode = sl::ReflexMode::eLowLatency;
+		reflex_options.mode = sl::ReflexMode::eOff;
 		reflex_options.useMarkersToOptimize = true;
 		reflex_options.idThread = 0;
 		gStreamline.reflex_set_options(reflex_options);
 	}
+
+	if(Engine::get_singleton()->is_editor_hint() == false)
+	{
+		set_nvidia_parameter(RD::NV_PARAM_REFLEX_ENABLE, (double)GLOBAL_GET("rendering/nvidia/reflex_mode"));
+		set_nvidia_parameter(RD::NV_PARAM_REFLEX_FRAME_LIMIT_US, (double)GLOBAL_GET("rendering/nvidia/reflex_frame_limit_us"));
+	}
 #endif
 }
 
+void VulkanContext::set_nvidia_parameter(RenderingDevice::NvidiaParameter parameterType, const Variant &value) {
+	switch (parameterType) {
+#if USE_STREAMLINE
+		case RD::NV_PARAM_REFLEX_ENABLE: {
+			double val = (double)value;
+			sl::ReflexMode newMode;
+			if (val > 1.0)
+				newMode = sl::ReflexMode::eLowLatencyWithBoost;
+			else if (val > 0.0)
+				newMode = sl::ReflexMode::eLowLatency;
+			else
+				newMode = sl::ReflexMode::eOff;
+			
+			if (gStreamline.reflex_options.mode != newMode)
+				gStreamline.reflex_options_dirty = true;
+			gStreamline.reflex_options.mode = newMode;
+			break;
+		}
+		case RD::NV_PARAM_REFLEX_FRAME_LIMIT_US: {
+			double val = (double)value;
+			bool updated = gStreamline.reflex_options.frameLimitUs != (unsigned int)val;
+			gStreamline.reflex_options.frameLimitUs = (unsigned int)val;
+			if (updated)
+				gStreamline.reflex_options_dirty = true;
+			break;
+		}
+#endif
+					
+	}
+}
+
 void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
-#ifdef USE_STREAMLINE
+#if USE_STREAMLINE
 	if(streamline_capabilities.reflexAvailable == false)
 		return;
 
@@ -208,9 +248,13 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 	switch(marker)
 	{
 		case RenderingDevice::BeforeMessageLoop:
+			if (gStreamline.reflex_options_dirty)
+				gStreamline.reflex_set_options(gStreamline.reflex_options);
 			streamline_framemarker = gStreamline.get_frame_token();
-			gStreamline.reflex_sleep((sl::FrameToken*)streamline_framemarker);
+			if (gStreamline.reflex_options.mode != sl::ReflexMode::eOff || gStreamline.reflex_options.frameLimitUs > 0)
+				gStreamline.reflex_sleep((sl::FrameToken*)streamline_framemarker);
 			sl_marker = sl::ReflexMarker::eInputSample; 
+
 			break;
 		case RenderingDevice::BeginRender:
 			sl_marker = sl::ReflexMarker::eRenderSubmitStart; break;
@@ -218,7 +262,7 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 			sl_marker = sl::ReflexMarker::eRenderSubmitEnd; break;
 		case RenderingDevice::BeginSimulation:
 			// Handle ping events before simulation starts
-			if(Input::get_singleton()->get_last_ping_frame() != lastPingFrameDetected) {
+			if (Input::get_singleton()->get_last_ping_frame() != lastPingFrameDetected) {
 				lastPingFrameDetected = Input::get_singleton()->get_last_ping_frame();
 				streamline_emit(RenderingDevice::PcPing);
 			}

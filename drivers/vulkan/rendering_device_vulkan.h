@@ -1256,6 +1256,7 @@ public:
 	virtual void sync(); // For local device.
 
 	virtual void emit_marker(MarkerType marker);
+	virtual void set_nvidia_parameter(NvidiaParameter parameterType, const Variant& value);
 
 	virtual uint32_t get_frame_delay() const;
 

@@ -566,6 +566,7 @@ if selected_platform in platform_list:
     # "custom" means do nothing and let users set their own optimization flags.
     # Needs to happen after configure to have `env.msvc` defined.
     if env.msvc:
+        env.Append(LINKFLAGS=["/INCREMENTAL:NO"])
         if env["debug_symbols"]:
             env.Append(CCFLAGS=["/Zi", "/FS"])
             env.Append(LINKFLAGS=["/DEBUG:FULL"])

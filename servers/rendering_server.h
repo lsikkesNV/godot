@@ -990,6 +990,15 @@ public:
 	virtual void viewport_set_vrs_mode(RID p_viewport, ViewportVRSMode p_mode) = 0;
 	virtual void viewport_set_vrs_texture(RID p_viewport, RID p_texture) = 0;
 
+	/* NVIDIA API */
+#if 0
+	enum NvidiaViewportSettingEnum {
+		NV_SETTING_COUNT
+	};
+
+	virtual void viewport_set_nvidia_setting(RID p_viewport, NvidiaViewportSettingEnum setting, const Variant& value ) = 0;
+#endif
+
 	/* SKY API */
 
 	enum SkyMode {
@@ -1662,6 +1671,7 @@ VARIANT_ENUM_CAST(RenderingServer::ViewportOcclusionCullingBuildQuality);
 VARIANT_ENUM_CAST(RenderingServer::ViewportSDFOversize);
 VARIANT_ENUM_CAST(RenderingServer::ViewportSDFScale);
 VARIANT_ENUM_CAST(RenderingServer::ViewportVRSMode);
+//VARIANT_ENUM_CAST(RenderingServer::NvidiaViewportSettingEnum); // NVIDIA
 VARIANT_ENUM_CAST(RenderingServer::SkyMode);
 VARIANT_ENUM_CAST(RenderingServer::EnvironmentBG);
 VARIANT_ENUM_CAST(RenderingServer::EnvironmentAmbientSource);

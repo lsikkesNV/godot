@@ -841,6 +841,13 @@ void RenderingDevice::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_driver_resource", "resource", "rid", "index"), &RenderingDevice::get_driver_resource);
 
+// NVIDIA
+	ClassDB::bind_method(D_METHOD("set_nvidia_parameter", "parameterType", "value"), &RenderingDevice::set_nvidia_parameter);
+
+	BIND_ENUM_CONSTANT(NV_PARAM_REFLEX_ENABLE);
+	BIND_ENUM_CONSTANT(NV_PARAM_REFLEX_FRAME_LIMIT_US);
+// /NVIDIA
+
 	BIND_ENUM_CONSTANT(DEVICE_TYPE_OTHER);
 	BIND_ENUM_CONSTANT(DEVICE_TYPE_INTEGRATED_GPU);
 	BIND_ENUM_CONSTANT(DEVICE_TYPE_DISCRETE_GPU);

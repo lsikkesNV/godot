@@ -341,6 +341,14 @@ private:
 		Rect2i parent_safe_rect;
 	};
 
+	// NVIDIA
+#if 0
+	bool nv_reflex_enable = false;
+	bool nv_reflex_boost_enable = false;
+	int nv_reflex_frametime_limit_us = 0;
+#endif
+	// /NVIDIA
+
 	// VRS
 	VRSMode vrs_mode = VRS_DISABLED;
 	Ref<Texture2D> vrs_texture;
@@ -632,6 +640,19 @@ public:
 
 	void set_default_canvas_item_texture_repeat(DefaultCanvasItemTextureRepeat p_repeat);
 	DefaultCanvasItemTextureRepeat get_default_canvas_item_texture_repeat() const;
+
+	// NVIDIA
+#if 0
+	void set_nvidia_reflex_enable(bool p_use_reflex);
+	bool is_nvidia_reflex_enabled() const;
+
+	void set_nvidia_reflex_boost_enable(bool p_use_reflex_boost);
+	bool is_nvidia_reflex_boost_enabled() const;
+
+	void set_nvidia_reflex_frame_limit(int p_reflex_frame_limit_us);
+	int get_nvidia_reflex_frame_limit() const;
+#endif
+	// /NVIDIA
 
 	// VRS
 

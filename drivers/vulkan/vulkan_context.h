@@ -349,10 +349,13 @@ public:
 	void set_vsync_mode(DisplayServer::WindowID p_window, DisplayServer::VSyncMode p_mode);
 	DisplayServer::VSyncMode get_vsync_mode(DisplayServer::WindowID p_window = 0) const;
 
+	// NVIDIA
 	void streamline_initialize();
 	void streamline_enumerate_capabilities();
 	void streamline_emit(RenderingDevice::MarkerType marker);
 	void streamline_init_post_device();
+	void set_nvidia_parameter(RenderingDevice::NvidiaParameter parameterType, const Variant& value);
+	// /NVIDIA
 
 	VulkanContext();
 	virtual ~VulkanContext();

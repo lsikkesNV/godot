@@ -661,6 +661,11 @@ public:
 	FUNC2(viewport_set_vrs_mode, RID, ViewportVRSMode)
 	FUNC2(viewport_set_vrs_texture, RID, RID)
 
+	/* NVIDIA API */
+#if 0
+	FUNC3(viewport_set_nvidia_setting, RID, NvidiaSettingEnum, double)
+#endif
+
 	/* ENVIRONMENT API */
 
 #undef server_name

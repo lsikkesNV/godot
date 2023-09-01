@@ -1294,6 +1294,15 @@ public:
 
 	virtual void emit_marker(MarkerType marker) = 0;
 
+	enum NvidiaParameter
+	{
+		NV_PARAM_REFLEX_ENABLE, // [double] 0.0 = off, 1.0 = on, 2.0 = on with boost
+		NV_PARAM_REFLEX_FRAME_LIMIT_US, // [double] frame limit in microseconds
+		NV_PARAM_COUNT,
+	};
+
+	virtual void set_nvidia_parameter(NvidiaParameter parameterType, const Variant& value) = 0;
+
 	enum MemoryType {
 		MEMORY_TEXTURES,
 		MEMORY_BUFFERS,
@@ -1424,6 +1433,10 @@ VARIANT_ENUM_CAST(RenderingDevice::FinalAction)
 VARIANT_ENUM_CAST(RenderingDevice::Limit)
 VARIANT_ENUM_CAST(RenderingDevice::MemoryType)
 VARIANT_ENUM_CAST(RenderingDevice::Features)
+
+// NVIDIA
+VARIANT_ENUM_CAST(RenderingDevice::NvidiaParameter)
+// /NVIDIA
 
 typedef RenderingDevice RD;
 

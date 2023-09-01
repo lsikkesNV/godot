@@ -72,6 +72,9 @@ void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 	//needs to be done before changes is reset to 0, to not force the editor to redraw
 	RS::get_singleton()->emit_signal(SNAME("frame_pre_draw"));
 
+	if (RD::get_singleton())
+		RD::get_singleton()->emit_marker(RenderingDevice::BeginRender);
+
 	changes = 0;
 
 	RSG::rasterizer->begin_frame(frame_step);
@@ -117,6 +120,9 @@ void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 
 		frame_drawn_callbacks.pop_front();
 	}
+
+	if (RD::get_singleton())
+		RD::get_singleton()->emit_marker(RenderingDevice::EndRender);
 	RS::get_singleton()->emit_signal(SNAME("frame_post_draw"));
 
 	if (RSG::utilities->get_captured_timestamps_count()) {

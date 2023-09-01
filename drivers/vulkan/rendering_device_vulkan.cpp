@@ -8709,6 +8709,10 @@ void RenderingDeviceVulkan::emit_marker(MarkerType marker) {
 	context->streamline_emit(marker);
 }
 
+void RenderingDeviceVulkan::set_nvidia_parameter(NvidiaParameter parameterType, const Variant& value) {
+	context->set_nvidia_parameter(parameterType, value);
+}
+
 VmaPool RenderingDeviceVulkan::_find_or_create_small_allocs_pool(uint32_t p_mem_type_index) {
 	if (small_allocs_pools.has(p_mem_type_index)) {
 		return small_allocs_pools[p_mem_type_index];

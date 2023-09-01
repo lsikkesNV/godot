@@ -2249,6 +2249,12 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("viewport_set_vrs_mode", "viewport", "mode"), &RenderingServer::viewport_set_vrs_mode);
 	ClassDB::bind_method(D_METHOD("viewport_set_vrs_texture", "viewport", "texture"), &RenderingServer::viewport_set_vrs_texture);
 
+	BIND_ENUM_CONSTANT(VIEWPORT_UPDATE_ONCE); // Then goes to disabled); must be manually updated.
+	BIND_ENUM_CONSTANT(VIEWPORT_UPDATE_WHEN_VISIBLE); // Default
+	BIND_ENUM_CONSTANT(VIEWPORT_UPDATE_WHEN_PARENT_VISIBLE);
+	BIND_ENUM_CONSTANT(VIEWPORT_UPDATE_ALWAYS);
+	
+
 	BIND_ENUM_CONSTANT(VIEWPORT_SCALING_3D_MODE_BILINEAR);
 	BIND_ENUM_CONSTANT(VIEWPORT_SCALING_3D_MODE_FSR);
 	BIND_ENUM_CONSTANT(VIEWPORT_SCALING_3D_MODE_MAX);
@@ -2346,6 +2352,17 @@ void RenderingServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(SKY_MODE_QUALITY);
 	BIND_ENUM_CONSTANT(SKY_MODE_INCREMENTAL);
 	BIND_ENUM_CONSTANT(SKY_MODE_REALTIME);
+
+	/* NVIDIA API */
+	
+	// NVIDIA
+	#if 0
+	ClassDB::bind_method(D_METHOD("viewport_set_nvidia_setting", "viewport", "nvidia"), &RenderingServer::viewport_set_nvidia_setting);
+
+	BIND_ENUM_CONSTANT(NV_SETTING_REFLEX_MODE);
+	BIND_ENUM_CONSTANT(NV_SETTING_REFLEX_FRAME_LIMITER_US);
+	#endif
+	// /NVIDIA
 
 	/* ENVIRONMENT */
 
@@ -2992,6 +3009,12 @@ void RenderingServer::init() {
 	GLOBAL_DEF_RST(PropertyInfo(Variant::INT, "rendering/limits/forward_renderer/threaded_render_minimum_instances", PROPERTY_HINT_RANGE, "32,65536,1"), 500);
 
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/limits/cluster_builder/max_clustered_elements", PROPERTY_HINT_RANGE, "32,8192,1"), 512);
+
+	// NVIDIA
+	GLOBAL_DEF("rendering/nvidia/reflex_enable", false);
+	GLOBAL_DEF("rendering/nvidia/reflex_low_latency_boost", false);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/nvidia/reflex_frame_limit_us", PROPERTY_HINT_RANGE, "0,1000000,1"), 0);
+	// /NVIDIA
 
 	// OpenGL limits
 	GLOBAL_DEF_RST(PropertyInfo(Variant::INT, "rendering/limits/opengl/max_renderable_elements", PROPERTY_HINT_RANGE, "1024,65536,1"), 65536);
