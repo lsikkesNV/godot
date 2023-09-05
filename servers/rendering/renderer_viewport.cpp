@@ -1333,19 +1333,6 @@ void RendererViewport::viewport_set_vrs_texture(RID p_viewport, RID p_texture) {
 	_configure_3d_render_buffers(viewport);
 }
 
-// NVIDIA
-#if 0
-void RendererViewport::viewport_set_nvidia_setting(RID p_viewport, RS::NvidiaSettingEnum setting, double value ) {
-	Viewport *viewport = viewport_owner.get_or_null(p_viewport);
-	ERR_FAIL_COND(!viewport);
-	unsigned int settingID = (unsigned int)setting;
-	if (settingID >= RS::NV_SETTING_COUNT)
-		return;
-	viewport->nv_setting[settingID] = value;
-}
-#endif
-// /NVIDIA
-
 bool RendererViewport::free(RID p_rid) {
 	if (viewport_owner.owns(p_rid)) {
 		Viewport *viewport = viewport_owner.get_or_null(p_rid);

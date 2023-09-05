@@ -3436,55 +3436,6 @@ Viewport::DefaultCanvasItemTextureRepeat Viewport::get_default_canvas_item_textu
 	return default_canvas_item_texture_repeat;
 }
 
-// NVIDIA
-#if 0
-void Viewport::set_nvidia_reflex_mode(int p_reflex_mode) {
-	ERR_MAIN_THREAD_GUARD;
-	if (nv_reflex_mode == p_reflex_mode) {
-		return;
-	}
-
-	nv_reflex_mode = p_reflex_mode;
-	RS::get_singleton()->viewport_set_nvidia_setting(viewport, RS::NV_SETTING_REFLEX_MODE, nv_reflex_mode);
-}
-
-bool Viewport::is_nvidia_reflex_enabled() const {
-	ERR_READ_THREAD_GUARD_V(0);
-	return nv_reflex_enable;
-}
-
-void Viewport::set_nvidia_reflex_boost_enable(bool p_reflex_boost_enable) {
-	ERR_MAIN_THREAD_GUARD;
-	if (nv_reflex_boost_enable == p_reflex_boost_enable) {
-		return;
-	}
-
-	nv_reflex_boost_enable = p_reflex_boost_enable;
-	RS::get_singleton()->viewport_set_nvidia_setting(viewport, RS::NV_SETTING_REFLEX_BOOST_ENABLE, nv_reflex_boost_enable?1.0:0.0);
-}
-
-bool Viewport::is_nvidia_reflex_boost_enabled() const {
-	ERR_READ_THREAD_GUARD_V(0);
-	return nv_reflex_boost_enable;
-}
-
-void Viewport::set_nvidia_reflex_frame_limit(int p_reflex_frame_limit_us) {
-	ERR_MAIN_THREAD_GUARD;
-	if (nv_reflex_frametime_limit_us == p_reflex_frame_limit_us) {
-		return;
-	}
-
-	nv_reflex_frametime_limit_us = p_reflex_frame_limit_us;
-	RS::get_singleton()->viewport_set_nvidia_setting(viewport, RS::NV_SETTING_REFLEX_FRAME_LIMITER_US, (double)nv_reflex_frametime_limit_us);
-}
-int Viewport::get_nvidia_reflex_frame_limit() const {
-	ERR_READ_THREAD_GUARD_V(0);
-	return nv_reflex_frametime_limit_us;
-}
-#endif
-
-// /NVIDIA
-
 void Viewport::set_vrs_mode(Viewport::VRSMode p_vrs_mode) {
 	ERR_MAIN_THREAD_GUARD;
 	// Note, set this even if not supported on this hardware, it will only be used if it is but we want to save the value as set by the user.
@@ -4335,19 +4286,6 @@ void Viewport::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "world_3d", PROPERTY_HINT_RESOURCE_TYPE, "World3D"), "set_world_3d", "get_world_3d");
 #endif // _3D_DISABLED
 
-	// NVIDIA
-#if 0
-	ClassDB::bind_method(D_METHOD("set_nvidia_reflex_enable", "nvidia_reflex_enable"), &Viewport::set_nvidia_reflex_enable);
-	ClassDB::bind_method(D_METHOD("is_nvidia_reflex_enabled"), &Viewport::is_nvidia_reflex_enabled);
-
-	ClassDB::bind_method(D_METHOD("set_nvidia_reflex_boost_enable", "nvidia_reflex_boost_enable"), &Viewport::set_nvidia_reflex_boost_enable);
-	ClassDB::bind_method(D_METHOD("is_nvidia_reflex_boost_enabled"), &Viewport::is_nvidia_reflex_boost_enabled);
-
-	ClassDB::bind_method(D_METHOD("set_nvidia_reflex_frame_limit", "nvidia_reflex_frame_limit"), &Viewport::set_nvidia_reflex_frame_limit);
-	ClassDB::bind_method(D_METHOD("get_nvidia_reflex_frame_limit"), &Viewport::get_nvidia_reflex_frame_limit);
-#endif
-	// /NVIDIA
-
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "world_2d", PROPERTY_HINT_RESOURCE_TYPE, "World2D", PROPERTY_USAGE_NONE), "set_world_2d", "get_world_2d");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "transparent_bg"), "set_transparent_background", "has_transparent_background");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "handle_input_locally"), "set_handle_input_locally", "is_handling_input_locally");
@@ -4362,14 +4300,6 @@ void Viewport::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_occlusion_culling"), "set_use_occlusion_culling", "is_using_occlusion_culling");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mesh_lod_threshold", PROPERTY_HINT_RANGE, "0,1024,0.1"), "set_mesh_lod_threshold", "get_mesh_lod_threshold");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "debug_draw", PROPERTY_HINT_ENUM, "Disabled,Unshaded,Lighting,Overdraw,Wireframe"), "set_debug_draw", "get_debug_draw");
-	// NVIDIA
-#if 0
-	ADD_GROUP("NVIDIA", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "nvidia_reflex_enable"), "set_nvidia_reflex_enable", "is_nvidia_reflex_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "nvidia_reflex_boost_enable"), "set_nvidia_reflex_boost_enable", "is_nvidia_reflex_boost_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "nvidia_reflex_frame_limit", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_nvidia_reflex_frame_limit", "get_nvidia_reflex_frame_limit");
-#endif
-	// /NVIDIA
 #ifndef _3D_DISABLED
 	ADD_GROUP("Scaling 3D", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "scaling_3d_mode", PROPERTY_HINT_ENUM, "Bilinear (Fastest),FSR 1.0 (Fast)"), "set_scaling_3d_mode", "get_scaling_3d_mode");
@@ -4547,14 +4477,6 @@ Viewport::Viewport() {
 	set_fsr_sharpness((float)GLOBAL_GET("rendering/scaling_3d/fsr_sharpness"));
 	set_texture_mipmap_bias((float)GLOBAL_GET("rendering/textures/default_filters/texture_mipmap_bias"));
 #endif // _3D_DISABLED
-
-	// NVIDIA
-#if 0
-	set_nvidia_reflex_enable(GLOBAL_GET("rendering/nvidia/reflex_enable"));
-	set_nvidia_reflex_boost_enable(GLOBAL_GET("rendering/nvidia/reflex_low_latency_boost"));
-	set_nvidia_reflex_frame_limit((int)GLOBAL_GET("rendering/nvidia/reflex_frame_limit_us"));
-#endif
-	// /NVIDIA
 
 	set_sdf_oversize(sdf_oversize); // Set to server.
 }

@@ -11,6 +11,7 @@ class StreamlineContext
 public:
 	// Interposer
 	PFun_slInit* slInit = nullptr;
+	PFun_slShutdown *slShutdown = nullptr;
 	PFun_slIsFeatureSupported* slIsFeatureSupported = nullptr;
 	PFun_slGetFeatureFunction* slGetFeatureFunction = nullptr;
 	PFun_slGetNewFrameToken* slGetNewFrameToken = nullptr;
@@ -41,6 +42,7 @@ void StreamlineContext::load_functions() {
 	if(streamline == nullptr)
 		return;
 	this->slInit = (PFun_slInit*)GetProcAddress(streamline, "slInit");
+	this->slShutdown = (PFun_slShutdown *)GetProcAddress(streamline, "slShutdown");
 	this->slIsFeatureSupported = (PFun_slIsFeatureSupported*)GetProcAddress(streamline, "slIsFeatureSupported");
 	this->slGetFeatureFunction = (PFun_slGetFeatureFunction*)GetProcAddress(streamline, "slGetFeatureFunction");
 	this->slGetNewFrameToken = (PFun_slGetNewFrameToken*)GetProcAddress(streamline, "slGetNewFrameToken");
@@ -68,6 +70,9 @@ VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhy
 }
 
 void StreamlineContext::reflex_set_options(const sl::ReflexOptions& opts) {
+	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
+		return;
+
 	reflex_options = opts;
 	reflex_options_dirty = false;
 	sl::Result result = this->slReflexSetOptions ? this->slReflexSetOptions(opts) : sl::Result::eOk;
@@ -149,6 +154,9 @@ const char* StreamlineContext::result_to_string(sl::Result result) {
 
 void VulkanContext::streamline_initialize() {
 #if USE_STREAMLINE
+	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
+		return;
+
 	if(gStreamline.slInit != nullptr)
 		return; // already initialized.
 
@@ -168,12 +176,25 @@ void VulkanContext::streamline_initialize() {
 	pref.numFeaturesToLoad = sizeof(featuresToLoad) / sizeof(featuresToLoad[0]);
 	pref.renderAPI = sl::RenderAPI::eVulkan;
 	pref.showConsole = true;
-	pref.logLevel = sl::LogLevel::eVerbose;
+	if(bool(GLOBAL_GET("rendering/nvidia/streamline_log")) == true)
+		pref.logLevel = sl::LogLevel::eVerbose;
+	else
+		pref.logLevel = sl::LogLevel::eOff;
 	sl::Result result = gStreamline.slInit(pref, sl::kSDKVersion);
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 
 	gStreamline.load_functions_post_init();
 
+#endif
+}
+
+void VulkanContext::streamline_destroy() {
+#if USE_STREAMLINE
+	if (gStreamline.slInit == nullptr || gStreamline.slShutdown == nullptr)
+		return; // not initialized. skip.
+
+	sl::Result result = gStreamline.slShutdown();
+	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 #endif
 }
 
@@ -199,18 +220,15 @@ void VulkanContext::streamline_init_post_device() {
 		gStreamline.reflex_set_options(reflex_options);
 	}
 
-	if(Engine::get_singleton()->is_editor_hint() == false)
-	{
-		set_nvidia_parameter(RD::NV_PARAM_REFLEX_ENABLE, (double)GLOBAL_GET("rendering/nvidia/reflex_mode"));
-		set_nvidia_parameter(RD::NV_PARAM_REFLEX_FRAME_LIMIT_US, (double)GLOBAL_GET("rendering/nvidia/reflex_frame_limit_us"));
-	}
+	set_nvidia_parameter(RD::NV_PARAM_REFLEX_MODE, (double)GLOBAL_GET("rendering/nvidia/reflex_mode"));
+	set_nvidia_parameter(RD::NV_PARAM_REFLEX_FRAME_LIMIT_US, (double)GLOBAL_GET("rendering/nvidia/reflex_frame_limit_us"));
 #endif
 }
 
 void VulkanContext::set_nvidia_parameter(RenderingDevice::NvidiaParameter parameterType, const Variant &value) {
 	switch (parameterType) {
 #if USE_STREAMLINE
-		case RD::NV_PARAM_REFLEX_ENABLE: {
+		case RD::NV_PARAM_REFLEX_MODE: {
 			double val = (double)value;
 			sl::ReflexMode newMode;
 			if (val > 1.0)
@@ -234,16 +252,19 @@ void VulkanContext::set_nvidia_parameter(RenderingDevice::NvidiaParameter parame
 			break;
 		}
 #endif
-					
+		default:
+			break;
 	}
 }
 
 void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 #if USE_STREAMLINE
+	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
+		return;
 	if(streamline_capabilities.reflexAvailable == false)
 		return;
 
-	static unsigned long long lastPingFrameDetected = 0; // TODO: Do this differently? Multi window?
+	static unsigned long long lastPingFrameDetected = 0; // TODO: Do this differently. Multi window?
 	sl::ReflexMarker sl_marker;
 	switch(marker)
 	{

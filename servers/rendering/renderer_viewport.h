@@ -117,10 +117,6 @@ public:
 
 		bool transparent_bg = false;
 
-#if 0
-		double nv_setting[RS::NV_VIEWPORT_SETTING_COUNT]; // NVIDIA
-#endif
-
 		uint32_t canvas_cull_mask = 0xffffffff;
 
 		struct CanvasKey {
@@ -183,12 +179,6 @@ public:
 
 			time_gpu_begin = 0;
 			time_gpu_end = 0;
-
-			// NVIDIA
-#if 0
-			memset(nv_setting, sizeof(nv_setting), 0);
-#endif
-			// /NVIDIA
 		}
 	};
 
@@ -298,12 +288,6 @@ public:
 
 	void viewport_set_vrs_mode(RID p_viewport, RS::ViewportVRSMode p_mode);
 	void viewport_set_vrs_texture(RID p_viewport, RID p_texture);
-
-	// NVIDIA
-#if 0
-	void viewport_set_nvidia_setting(RID p_viewport, RS::NvidiaViewportSettingEnum setting, double value );
-#endif
-	// /NVIDIA
 
 	void handle_timestamp(String p_timestamp, uint64_t p_cpu_time, uint64_t p_gpu_time);
 

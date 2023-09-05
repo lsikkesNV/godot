@@ -2353,17 +2353,6 @@ void RenderingServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(SKY_MODE_INCREMENTAL);
 	BIND_ENUM_CONSTANT(SKY_MODE_REALTIME);
 
-	/* NVIDIA API */
-	
-	// NVIDIA
-	#if 0
-	ClassDB::bind_method(D_METHOD("viewport_set_nvidia_setting", "viewport", "nvidia"), &RenderingServer::viewport_set_nvidia_setting);
-
-	BIND_ENUM_CONSTANT(NV_SETTING_REFLEX_MODE);
-	BIND_ENUM_CONSTANT(NV_SETTING_REFLEX_FRAME_LIMITER_US);
-	#endif
-	// /NVIDIA
-
 	/* ENVIRONMENT */
 
 	ClassDB::bind_method(D_METHOD("environment_create"), &RenderingServer::environment_create);
@@ -3011,8 +3000,8 @@ void RenderingServer::init() {
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/limits/cluster_builder/max_clustered_elements", PROPERTY_HINT_RANGE, "32,8192,1"), 512);
 
 	// NVIDIA
-	GLOBAL_DEF("rendering/nvidia/reflex_enable", false);
-	GLOBAL_DEF("rendering/nvidia/reflex_low_latency_boost", false);
+	GLOBAL_DEF("rendering/nvidia/streamline_log", false);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/nvidia/reflex_mode", PROPERTY_HINT_RANGE, "0,2,1"), 0);
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/nvidia/reflex_frame_limit_us", PROPERTY_HINT_RANGE, "0,1000000,1"), 0);
 	// /NVIDIA
 

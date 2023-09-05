@@ -351,6 +351,7 @@ public:
 
 	// NVIDIA
 	void streamline_initialize();
+	void streamline_destroy();
 	void streamline_enumerate_capabilities();
 	void streamline_emit(RenderingDevice::MarkerType marker);
 	void streamline_init_post_device();

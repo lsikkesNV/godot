@@ -2759,6 +2759,8 @@ VulkanContext::VulkanContext() {
 }
 
 VulkanContext::~VulkanContext() {
+	streamline_destroy();
+
 	if (queue_props) {
 		free(queue_props);
 	}

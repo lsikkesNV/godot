@@ -2678,16 +2678,6 @@ void Node3DEditorViewport::_project_settings_changed() {
 
 	const float texture_mipmap_bias = GLOBAL_GET("rendering/textures/default_filters/texture_mipmap_bias");
 	viewport->set_texture_mipmap_bias(texture_mipmap_bias);
-
-	// NVIDIA
-#if 0
-	const int nv_reflex_enable = GLOBAL_GET("rendering/nvidia/reflex_mode");
-	viewport->set_nvidia_reflex_mode(nv_reflex_enable);
-
-	const int nv_reflex_frame_limit = GLOBAL_GET("rendering/nvidia/reflex_frame_limit_us");
-	viewport->set_nvidia_reflex_frame_limit(nv_reflex_frame_limit);
-#endif
-	// /NVIDIA
 }
 
 void Node3DEditorViewport::_notification(int p_what) {

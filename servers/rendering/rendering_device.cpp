@@ -844,7 +844,7 @@ void RenderingDevice::_bind_methods() {
 // NVIDIA
 	ClassDB::bind_method(D_METHOD("set_nvidia_parameter", "parameterType", "value"), &RenderingDevice::set_nvidia_parameter);
 
-	BIND_ENUM_CONSTANT(NV_PARAM_REFLEX_ENABLE);
+	BIND_ENUM_CONSTANT(NV_PARAM_REFLEX_MODE);
 	BIND_ENUM_CONSTANT(NV_PARAM_REFLEX_FRAME_LIMIT_US);
 // /NVIDIA
 

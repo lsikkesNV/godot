@@ -1296,8 +1296,8 @@ public:
 
 	enum NvidiaParameter
 	{
-		NV_PARAM_REFLEX_ENABLE, // [double] 0.0 = off, 1.0 = on, 2.0 = on with boost
-		NV_PARAM_REFLEX_FRAME_LIMIT_US, // [double] frame limit in microseconds
+		NV_PARAM_REFLEX_MODE, 				// [double] 0.0 = off, 1.0 = on, 2.0 = on with boost
+		NV_PARAM_REFLEX_FRAME_LIMIT_US, 	// [double] frame limit in microseconds
 		NV_PARAM_COUNT,
 	};
 
