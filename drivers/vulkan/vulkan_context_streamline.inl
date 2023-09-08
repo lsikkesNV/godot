@@ -10,11 +10,16 @@ class StreamlineContext
 {
 public:
 	// Interposer
-	PFun_slInit* slInit = nullptr;
+	PFun_slInit *slInit = nullptr;
 	PFun_slShutdown *slShutdown = nullptr;
-	PFun_slIsFeatureSupported* slIsFeatureSupported = nullptr;
-	PFun_slGetFeatureFunction* slGetFeatureFunction = nullptr;
-	PFun_slGetNewFrameToken* slGetNewFrameToken = nullptr;
+	PFun_slIsFeatureSupported *slIsFeatureSupported = nullptr;
+	PFun_slGetFeatureFunction *slGetFeatureFunction = nullptr;
+	PFun_slGetNewFrameToken *slGetNewFrameToken = nullptr;
+	PFun_slAllocateResources *slAllocateResources = nullptr;
+	PFun_slFreeResources *slFreeResources = nullptr;
+	PFun_slEvaluateFeature *slEvaluateFeature = nullptr;
+	PFun_slSetTag *slSetTag = nullptr;
+	PFun_slSetConstants *slSetConstants = nullptr;
 
 	// Reflex
 	sl::ReflexOptions reflex_options;
@@ -23,6 +28,11 @@ public:
 	PFun_slReflexSetOptions* slReflexSetOptions = nullptr;
 	PFun_slReflexSetMarker* slReflexSetMarker = nullptr;
 	PFun_slReflexSleep* slReflexSleep = nullptr;
+
+	// DLSS Super Resolution
+	PFun_slDLSSGetOptimalSettings *slDLSSGetOptimalSettings = nullptr;
+	PFun_slDLSSGetState *slDLSSGetState = nullptr;
+	PFun_slDLSSSetOptions *slDLSSSetOptions = nullptr;
 
 	void load_functions();
 	void load_functions_post_init();
@@ -41,11 +51,18 @@ void StreamlineContext::load_functions() {
 	HMODULE streamline = LoadLibraryA("sl.interposer.dll");
 	if(streamline == nullptr)
 		return;
-	this->slInit = (PFun_slInit*)GetProcAddress(streamline, "slInit");
+	this->slInit = (PFun_slInit *)GetProcAddress(streamline, "slInit");
 	this->slShutdown = (PFun_slShutdown *)GetProcAddress(streamline, "slShutdown");
-	this->slIsFeatureSupported = (PFun_slIsFeatureSupported*)GetProcAddress(streamline, "slIsFeatureSupported");
-	this->slGetFeatureFunction = (PFun_slGetFeatureFunction*)GetProcAddress(streamline, "slGetFeatureFunction");
-	this->slGetNewFrameToken = (PFun_slGetNewFrameToken*)GetProcAddress(streamline, "slGetNewFrameToken");
+	this->slIsFeatureSupported = (PFun_slIsFeatureSupported *)GetProcAddress(streamline, "slIsFeatureSupported");
+	this->slGetFeatureFunction = (PFun_slGetFeatureFunction *)GetProcAddress(streamline, "slGetFeatureFunction");
+	this->slGetNewFrameToken = (PFun_slGetNewFrameToken *)GetProcAddress(streamline, "slGetNewFrameToken");
+	
+	this->slAllocateResources = (PFun_slAllocateResources *)GetProcAddress(streamline, "slAllocateResources");
+	this->slFreeResources = (PFun_slFreeResources *)GetProcAddress(streamline, "slFreeResources");
+	this->slEvaluateFeature = (PFun_slEvaluateFeature *)GetProcAddress(streamline, "slEvaluateFeature");
+	this->slSetTag = (PFun_slSetTag *)GetProcAddress(streamline, "slSetTag");
+	this->slSetConstants = (PFun_slSetConstants *)GetProcAddress(streamline, "slSetConstants");
+
 #endif
 }
 
