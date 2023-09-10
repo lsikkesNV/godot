@@ -111,6 +111,12 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_fsr2(Rende
 	}
 }
 
+void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_dlss(RendererRD::DLSSEffect *effect) {
+	if (dlss_context == nullptr) {
+		dlss_context = effect->create_context(render_buffers->get_internal_size(), render_buffers->get_target_size());
+	}
+}
+
 void RenderForwardClustered::RenderBufferDataForwardClustered::free_data() {
 	// JIC, should already have been cleared
 	if (render_buffers) {
@@ -129,6 +135,11 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::free_data() {
 	if (fsr2_context) {
 		memdelete(fsr2_context);
 		fsr2_context = nullptr;
+	}
+
+	if (dlss_context) {
+		memdelete(dlss_context);
+		dlss_context = nullptr;
 	}
 
 	if (!render_sdfgi_uniform_set.is_null() && RD::get_singleton()->uniform_set_is_valid(render_sdfgi_uniform_set)) {
@@ -1623,6 +1634,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	bool using_debug_mvs = get_debug_draw_mode() == RS::VIEWPORT_DEBUG_DRAW_MOTION_VECTORS;
 	bool using_taa = rb->get_use_taa();
 	bool using_fsr2 = rb->get_scaling_3d_mode() == RS::VIEWPORT_SCALING_3D_MODE_FSR2;
+	bool using_dlss = rb->get_scaling_3d_mode() == RS::VIEWPORT_SCALING_3D_MODE_DLSS;
 
 	// check if we need motion vectors
 	bool motion_vectors_required;
@@ -1631,6 +1643,8 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	} else if (!is_reflection_probe && using_taa) {
 		motion_vectors_required = true;
 	} else if (!is_reflection_probe && using_fsr2) {
+		motion_vectors_required = true;
+	} else if (!is_reflection_probe && using_dlss) {
 		motion_vectors_required = true;
 	} else {
 		motion_vectors_required = false;
@@ -1655,7 +1669,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	bool using_voxelgi = false;
 	bool reverse_cull = p_render_data->scene_data->cam_transform.basis.determinant() < 0;
 	bool using_ssil = !is_reflection_probe && p_render_data->environment.is_valid() && environment_get_ssil_enabled(p_render_data->environment);
-	bool using_motion_pass = rb_data.is_valid() && using_fsr2;
+	bool using_motion_pass = rb_data.is_valid() && (using_fsr2 || using_dlss);
 
 	if (is_reflection_probe) {
 		uint32_t resolution = light_storage->reflection_probe_instance_get_resolution(p_render_data->reflection_probe);
@@ -2153,7 +2167,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	RD::get_singleton()->draw_command_begin_label("Resolve");
 
 	if (rb_data.is_valid() && rb->get_msaa_3d() != RS::VIEWPORT_MSAA_DISABLED) {
-		bool resolve_velocity_buffer = (using_taa || using_fsr2) && rb->has_velocity_buffer(true);
+		bool resolve_velocity_buffer = (using_taa || using_fsr2 || using_dlss) && rb->has_velocity_buffer(true);
 		for (uint32_t v = 0; v < rb->get_view_count(); v++) {
 			RD::get_singleton()->texture_resolve_multisample(rb->get_color_msaa(v), rb->get_internal_texture(v));
 			resolve_effects->resolve_depth(rb->get_depth_msaa(v), rb->get_depth_texture(v), rb->get_internal_size(), texture_multisamples[rb->get_msaa_3d()]);
@@ -2173,7 +2187,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	}
 	RD::get_singleton()->draw_command_end_label();
 
-	if (rb_data.is_valid() && (using_fsr2 || using_taa)) {
+	if (rb_data.is_valid() && (using_fsr2 || using_taa || using_dlss)) {
 		if (using_fsr2) {
 			rb->ensure_upscaled();
 			rb_data->ensure_fsr2(fsr2_effect);
@@ -2213,6 +2227,46 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				params.reprojection = prev_proj.flipped_y() * prev_transform.affine_inverse() * cur_transform * cur_proj.flipped_y().inverse();
 
 				fsr2_effect->upscale(params);
+			}
+		} else if (using_dlss) {
+			RENDER_TIMESTAMP("DLSS");
+			rb->ensure_upscaled();
+			rb_data->ensure_dlss(dlss_effect);
+
+			RID exposure;
+			if (RSG::camera_attributes->camera_attributes_uses_auto_exposure(p_render_data->camera_attributes)) {
+				exposure = luminance->get_current_luminance_buffer(rb);
+			}
+
+			for (uint32_t v = 0; v < rb->get_view_count(); v++) {
+				real_t fov = p_render_data->scene_data->cam_projection.get_fov();
+				real_t aspect = p_render_data->scene_data->cam_projection.get_aspect();
+				real_t fovy = p_render_data->scene_data->cam_projection.get_fovy(fov, aspect);
+				Vector2 jitter = p_render_data->scene_data->taa_jitter * Vector2(rb->get_internal_size()) * 0.5f;
+				RendererRD::DLSSEffect::Parameters params;
+				params.context = rb_data->get_dlss_context();
+				params.internal_size = rb->get_internal_size();
+				params.sharpness = CLAMP(1.0f - (rb->get_fsr_sharpness() / 2.0f), 0.0f, 1.0f);
+				params.color = rb->get_internal_texture(v);
+				params.depth = rb->get_depth_texture(v);
+				params.velocity = rb->get_velocity_buffer(false, v);
+				params.reactive = rb->get_internal_texture_reactive(v);
+				params.exposure = exposure;
+				params.output = rb->get_upscaled_texture(v);
+				params.z_near = p_render_data->scene_data->z_near;
+				params.z_far = p_render_data->scene_data->z_far;
+				params.fovy = fovy;
+				params.jitter = jitter;
+				params.delta_time = float(time_step);
+				params.reset_accumulation = false; // FIXME: The engine does not provide a way to reset the accumulation.
+
+				const Projection &prev_proj = p_render_data->scene_data->prev_cam_projection;
+				const Projection &cur_proj = p_render_data->scene_data->cam_projection;
+				const Transform3D &prev_transform = p_render_data->scene_data->prev_cam_transform;
+				const Transform3D &cur_transform = p_render_data->scene_data->cam_transform;
+				params.reprojection = prev_proj.flipped_y() * prev_transform.affine_inverse() * cur_transform * cur_proj.flipped_y().inverse();
+
+				dlss_effect->upscale(params);
 			}
 		} else if (using_taa) {
 			RENDER_TIMESTAMP("TAA");
@@ -4123,6 +4177,7 @@ RenderForwardClustered::RenderForwardClustered() {
 	resolve_effects = memnew(RendererRD::Resolve());
 	taa = memnew(RendererRD::TAA);
 	fsr2_effect = memnew(RendererRD::FSR2Effect);
+	dlss_effect = memnew(RendererRD::DLSSEffect);
 	ss_effects = memnew(RendererRD::SSEffects);
 }
 
@@ -4140,6 +4195,11 @@ RenderForwardClustered::~RenderForwardClustered() {
 	if (fsr2_effect) {
 		memdelete(fsr2_effect);
 		fsr2_effect = nullptr;
+	}
+
+	if (dlss_effect) {
+		memdelete(dlss_effect);
+		dlss_effect = nullptr;
 	}
 
 	if (resolve_effects != nullptr) {

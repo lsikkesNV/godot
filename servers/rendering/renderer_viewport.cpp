@@ -118,28 +118,28 @@ void RendererViewport::_configure_3d_render_buffers(Viewport *p_viewport) {
 		} else {
 			float scaling_3d_scale = p_viewport->scaling_3d_scale;
 			RS::ViewportScaling3DMode scaling_3d_mode = p_viewport->scaling_3d_mode;
-			bool scaling_3d_is_fsr = (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR) || (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2);
+			bool scaling_3d_is_upsampler = (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR) || (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2) || (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS);
 			bool use_taa = p_viewport->use_taa;
 
-			if (scaling_3d_is_fsr && (scaling_3d_scale > 1.0)) {
-				// FSR is not designed for downsampling.
+			if (scaling_3d_is_upsampler && (scaling_3d_scale > 1.0)) {
+				// Not designed for downsampling.
 				// Fall back to bilinear scaling.
-				WARN_PRINT_ONCE("FSR 3D resolution scaling is not designed for downsampling. Falling back to bilinear 3D resolution scaling.");
+				WARN_PRINT_ONCE("FSR/DLSS 3D resolution scaling is not designed for downsampling. Falling back to bilinear 3D resolution scaling.");
 				scaling_3d_mode = RS::VIEWPORT_SCALING_3D_MODE_BILINEAR;
 			}
 
-			bool upscaler_available = p_viewport->fsr_enabled;
-			if (scaling_3d_is_fsr && !upscaler_available) {
+			bool upscaler_available = (p_viewport->fsr_enabled || p_viewport->dlss_enabled);
+			if (scaling_3d_is_upsampler && !upscaler_available) {
 				// FSR is not actually available.
 				// Fall back to bilinear scaling.
-				WARN_PRINT_ONCE("FSR 3D resolution scaling is not available. Falling back to bilinear 3D resolution scaling.");
+				WARN_PRINT_ONCE("FSR/FSR2/DLSS 3D resolution scaling is not available. Falling back to bilinear 3D resolution scaling.");
 				scaling_3d_mode = RS::VIEWPORT_SCALING_3D_MODE_BILINEAR;
 			}
 
-			if (use_taa && scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2) {
-				// FSR2 can't be used with TAA.
-				// Turn it off and prefer using FSR2.
-				WARN_PRINT_ONCE("FSR 2 is not compatible with TAA. Turning TAA off.");
+			if (use_taa && (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2 || scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS) ) {
+				// FSR2/DLSS can't be used with TAA.
+				// Turn it off and prefer using FSR2/DLSS.
+				WARN_PRINT_ONCE("FSR2/DLSS is not compatible with TAA. Turning TAA off.");
 				use_taa = false;
 			}
 
@@ -159,6 +159,7 @@ void RendererViewport::_configure_3d_render_buffers(Viewport *p_viewport) {
 					break;
 				case RS::VIEWPORT_SCALING_3D_MODE_FSR:
 				case RS::VIEWPORT_SCALING_3D_MODE_FSR2:
+				case RS::VIEWPORT_SCALING_3D_MODE_DLSS:
 					width = p_viewport->size.width;
 					height = p_viewport->size.height;
 					render_width = MAX(width * scaling_3d_scale, 1.0); // width / (width * scaling)
@@ -183,7 +184,7 @@ void RendererViewport::_configure_3d_render_buffers(Viewport *p_viewport) {
 			}
 
 			uint32_t jitter_phase_count = 0;
-			if (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2) {
+			if (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2 || scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS) {
 				// Implementation has been copied from ffxFsr2GetJitterPhaseCount.
 				jitter_phase_count = uint32_t(8.0f * pow(float(width) / render_width, 2.0f));
 			} else if (use_taa) {
@@ -820,6 +821,7 @@ void RendererViewport::viewport_initialize(RID p_rid) {
 	viewport->viewport_render_direct_to_screen = false;
 
 	viewport->fsr_enabled = !RSG::rasterizer->is_low_end() && !viewport->disable_3d;
+	viewport->dlss_enabled = !RSG::rasterizer->is_low_end() && !viewport->disable_3d;
 }
 
 void RendererViewport::viewport_set_use_xr(RID p_viewport, bool p_use_xr) {
@@ -844,6 +846,7 @@ void RendererViewport::viewport_set_scaling_3d_mode(RID p_viewport, RS::Viewport
 	Viewport *viewport = viewport_owner.get_or_null(p_viewport);
 	ERR_FAIL_COND(!viewport);
 	ERR_FAIL_COND_EDMSG(p_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2 && OS::get_singleton()->get_current_rendering_method() != "forward_plus", "FSR2 is only available when using the Forward+ renderer.");
+	ERR_FAIL_COND_EDMSG(p_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS && OS::get_singleton()->get_current_rendering_method() != "forward_plus", "DLSS is only available when using the Forward+ renderer.");
 
 	if (viewport->scaling_3d_mode == p_mode) {
 		return;
@@ -919,7 +922,9 @@ void RendererViewport::_viewport_set_size(Viewport *p_viewport, int p_width, int
 }
 
 bool RendererViewport::_viewport_requires_motion_vectors(Viewport *p_viewport) {
-	return p_viewport->use_taa || p_viewport->scaling_3d_mode == RenderingServer::VIEWPORT_SCALING_3D_MODE_FSR2;
+	return p_viewport->use_taa ||
+		   p_viewport->scaling_3d_mode == RenderingServer::VIEWPORT_SCALING_3D_MODE_FSR2 ||
+		   p_viewport->scaling_3d_mode == RenderingServer::VIEWPORT_SCALING_3D_MODE_DLSS;
 }
 
 void RendererViewport::viewport_set_active(RID p_viewport, bool p_active) {

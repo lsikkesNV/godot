@@ -345,7 +345,7 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 	bool can_use_storage = _render_buffers_can_be_storage();
 
 	bool use_fsr = fsr && can_use_effects && rb->get_scaling_3d_mode() == RS::VIEWPORT_SCALING_3D_MODE_FSR;
-	bool use_upscaled_texture = rb->has_upscaled_texture() && rb->get_scaling_3d_mode() == RS::VIEWPORT_SCALING_3D_MODE_FSR2;
+	bool use_upscaled_texture = rb->has_upscaled_texture() && (rb->get_scaling_3d_mode() == RS::VIEWPORT_SCALING_3D_MODE_FSR2 || rb->get_scaling_3d_mode() == RS::VIEWPORT_SCALING_3D_MODE_DLSS);
 
 	RID render_target = rb->get_render_target();
 	RID color_texture = use_upscaled_texture ? rb->get_upscaled_texture() : rb->get_internal_texture();

@@ -1,10 +1,10 @@
 #ifdef USE_STREAMLINE
-#include <sl.h>
-#include <sl_consts.h>
-#include <sl_dlss.h>
-#include <sl_dlss_g.h>
-#include <sl_reflex.h>
-#include "vulkan_context.h"
+
+#include "../../thirdparty/streamline/include/sl.h"
+#include "../../thirdparty/streamline/include/sl_consts.h"
+#include "../../thirdparty/streamline/include/sl_dlss.h"
+#include "../../thirdparty/streamline/include/sl_dlss_g.h"
+#include "../../thirdparty/streamline/include/sl_reflex.h"
 
 class StreamlineContext
 {
@@ -36,15 +36,30 @@ public:
 
 	void load_functions();
 	void load_functions_post_init();
-	VulkanContext::StreamlineCapabilities enumerate_support(VkPhysicalDevice device);
 	static const char* result_to_string(sl::Result result);
 	void reflex_set_options(const sl::ReflexOptions& opts);
 	void reflex_marker(sl::FrameToken* frameToken, sl::ReflexMarker marker);
 	void reflex_sleep(sl::FrameToken* frameToken);
 	void reflex_get_state(sl::ReflexState& reflexState);
 	sl::FrameToken* get_frame_token();
-} gStreamline;
 
+	static StreamlineContext &get();
+
+	sl::FrameToken* last_token = nullptr;
+
+#ifdef STREAMLINE_IMPLEMENTATION
+	VulkanContext::StreamlineCapabilities enumerate_support(VkPhysicalDevice device);
+#endif
+};
+
+#ifdef STREAMLINE_IMPLEMENTATION
+
+#include "vulkan_context.h"
+
+StreamlineContext &StreamlineContext::get() {
+	static StreamlineContext _context;
+	return _context;
+}
 
 void StreamlineContext::load_functions() {
 #ifdef _WIN32
@@ -72,6 +87,9 @@ void StreamlineContext::load_functions_post_init() {
 	slGetFeatureFunction(sl::kFeatureReflex, "slReflexSleep", (void*&)this->slReflexSleep);
 	slGetFeatureFunction(sl::kFeatureReflex, "slReflexGetState", (void*&)this->slReflexGetState);
 
+	slGetFeatureFunction(sl::kFeatureDLSS, "slDLSSGetOptimalSettings", (void*&)this->slDLSSGetOptimalSettings);
+	slGetFeatureFunction(sl::kFeatureDLSS, "slDLSSGetState", (void*&)this->slDLSSGetState);
+	slGetFeatureFunction(sl::kFeatureDLSS, "slDLSSSetOptions", (void*&)this->slDLSSSetOptions);
 }
 
 VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhysicalDevice device) {
@@ -117,6 +135,7 @@ sl::FrameToken* StreamlineContext::get_frame_token() {
 	sl::FrameToken* token = nullptr;
 	sl::Result result = this->slGetNewFrameToken ? this->slGetNewFrameToken(token, nullptr) : sl::Result::eOk;
 	ERR_FAIL_COND_V_MSG(result != sl::Result::eOk, nullptr, StreamlineContext::result_to_string(result));
+	last_token = token;
 	return token;
 }
 
@@ -166,19 +185,22 @@ const char* StreamlineContext::result_to_string(sl::Result result) {
         default: return "sl::eUnknown";
     }
 }
+#endif // STREAMLINE_IMPLEMENTATION
 
-#endif
+#endif // USE_STREAMLINE
+
+#ifdef STREAMLINE_IMPLEMENTATION
 
 void VulkanContext::streamline_initialize() {
 #if USE_STREAMLINE
 	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
 		return;
 
-	if(gStreamline.slInit != nullptr)
+	if(StreamlineContext::get().slInit != nullptr)
 		return; // already initialized.
 
-	gStreamline.load_functions();
-	if(gStreamline.slInit == nullptr) {
+	StreamlineContext::get().load_functions();
+	if (StreamlineContext::get().slInit == nullptr) {
 		print_line("Streamline: Could not find slInit. Did the module load correctly?");
 		return;
 	}
@@ -197,30 +219,29 @@ void VulkanContext::streamline_initialize() {
 		pref.logLevel = sl::LogLevel::eVerbose;
 	else
 		pref.logLevel = sl::LogLevel::eOff;
-	sl::Result result = gStreamline.slInit(pref, sl::kSDKVersion);
+	sl::Result result = StreamlineContext::get().slInit(pref, sl::kSDKVersion);
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 
-	gStreamline.load_functions_post_init();
-
+	StreamlineContext::get().load_functions_post_init();
 #endif
 }
 
 void VulkanContext::streamline_destroy() {
 #if USE_STREAMLINE
-	if (gStreamline.slInit == nullptr || gStreamline.slShutdown == nullptr)
+	if (StreamlineContext::get().slInit == nullptr || StreamlineContext::get().slShutdown == nullptr)
 		return; // not initialized. skip.
 
-	sl::Result result = gStreamline.slShutdown();
+	sl::Result result = StreamlineContext::get().slShutdown();
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 #endif
 }
 
 void VulkanContext::streamline_enumerate_capabilities() {
 #if USE_STREAMLINE
-	if(gStreamline.slInit == nullptr)
+	if (StreamlineContext::get().slInit == nullptr)
 		return; // not initialized. skip.
 
-	streamline_capabilities = gStreamline.enumerate_support(gpu);
+	streamline_capabilities = StreamlineContext::get().enumerate_support(gpu);
 #endif
 }
 
@@ -234,7 +255,7 @@ void VulkanContext::streamline_init_post_device() {
 		reflex_options.mode = sl::ReflexMode::eOff;
 		reflex_options.useMarkersToOptimize = true;
 		reflex_options.idThread = 0;
-		gStreamline.reflex_set_options(reflex_options);
+		StreamlineContext::get().reflex_set_options(reflex_options);
 	}
 
 	set_nvidia_parameter(RD::NV_PARAM_REFLEX_MODE, (double)GLOBAL_GET("rendering/nvidia/reflex_mode"));
@@ -255,17 +276,17 @@ void VulkanContext::set_nvidia_parameter(RenderingDevice::NvidiaParameter parame
 			else
 				newMode = sl::ReflexMode::eOff;
 			
-			if (gStreamline.reflex_options.mode != newMode)
-				gStreamline.reflex_options_dirty = true;
-			gStreamline.reflex_options.mode = newMode;
+			if (StreamlineContext::get().reflex_options.mode != newMode)
+				StreamlineContext::get().reflex_options_dirty = true;
+			StreamlineContext::get().reflex_options.mode = newMode;
 			break;
 		}
 		case RD::NV_PARAM_REFLEX_FRAME_LIMIT_US: {
 			double val = (double)value;
-			bool updated = gStreamline.reflex_options.frameLimitUs != (unsigned int)val;
-			gStreamline.reflex_options.frameLimitUs = (unsigned int)val;
+			bool updated = StreamlineContext::get().reflex_options.frameLimitUs != (unsigned int)val;
+			StreamlineContext::get().reflex_options.frameLimitUs = (unsigned int)val;
 			if (updated)
-				gStreamline.reflex_options_dirty = true;
+				StreamlineContext::get().reflex_options_dirty = true;
 			break;
 		}
 #endif
@@ -286,11 +307,11 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 	switch(marker)
 	{
 		case RenderingDevice::BeforeMessageLoop:
-			if (gStreamline.reflex_options_dirty)
-				gStreamline.reflex_set_options(gStreamline.reflex_options);
-			streamline_framemarker = gStreamline.get_frame_token();
-			if (gStreamline.reflex_options.mode != sl::ReflexMode::eOff || gStreamline.reflex_options.frameLimitUs > 0)
-				gStreamline.reflex_sleep((sl::FrameToken*)streamline_framemarker);
+			if (StreamlineContext::get().reflex_options_dirty)
+				StreamlineContext::get().reflex_set_options(StreamlineContext::get().reflex_options);
+			streamline_framemarker = StreamlineContext::get().get_frame_token();
+			if (StreamlineContext::get().reflex_options.mode != sl::ReflexMode::eOff || StreamlineContext::get().reflex_options.frameLimitUs > 0)
+				StreamlineContext::get().reflex_sleep((sl::FrameToken *)streamline_framemarker);
 			sl_marker = sl::ReflexMarker::eInputSample; 
 
 			break;
@@ -317,6 +338,8 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 			sl_marker = sl::ReflexMarker::ePCLatencyPing; break;
 	};
 	if(streamline_framemarker)
-		gStreamline.reflex_marker((sl::FrameToken*)streamline_framemarker, sl_marker);
+		StreamlineContext::get().reflex_marker((sl::FrameToken *)streamline_framemarker, sl_marker);
 #endif
 }
+
+#endif // STREAMLINE_IMPLEMENTATION

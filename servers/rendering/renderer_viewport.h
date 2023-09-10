@@ -63,6 +63,7 @@ public:
 		float fsr_sharpness = 0.2f;
 		float texture_mipmap_bias = 0.0f;
 		bool fsr_enabled = false;
+		bool dlss_enabled = false;
 		uint32_t jitter_phase_count = 0;
 		RS::ViewportUpdateMode update_mode = RenderingServer::VIEWPORT_UPDATE_WHEN_VISIBLE;
 		RID render_target;

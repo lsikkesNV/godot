@@ -52,6 +52,7 @@
 
 VulkanHooks *VulkanContext::vulkan_hooks = nullptr;
 
+#define STREAMLINE_IMPLEMENTATION
 #include "vulkan_context_streamline.inl"
 
 Vector<VkAttachmentReference> VulkanContext::_convert_VkAttachmentReference2(uint32_t p_count, const VkAttachmentReference2 *p_refs) {

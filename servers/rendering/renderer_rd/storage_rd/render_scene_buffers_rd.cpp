@@ -136,6 +136,11 @@ void RenderSceneBuffersRD::configure(const RenderSceneBuffersConfiguration *p_co
 		texture_mipmap_bias -= 1.0;
 	}
 
+	if (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS) {
+		// NVIDIA: Could be improved, but -1.0 is a decent option. Ideally for 0.5 scale you'd go -2 mip bias, -2.5 for 0.33.
+		texture_mipmap_bias -= 1.0;
+	}
+
 	if (screen_space_aa == RS::VIEWPORT_SCREEN_SPACE_AA_FXAA) {
 		// Use negative mipmap LOD bias when FXAA is enabled to compensate for loss of sharpness.
 		// If both TAA and FXAA are enabled, combine their negative LOD biases together.
