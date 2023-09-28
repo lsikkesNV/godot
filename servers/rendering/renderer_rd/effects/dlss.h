@@ -63,6 +63,8 @@ public:
 		float sharpness = 0.0f;
 		bool reset_accumulation = false;
 		Projection reprojection;
+		Projection cam_projection;
+		Transform3D cam_transform;
 	};
 
 	DLSSEffect();

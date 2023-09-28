@@ -127,6 +127,19 @@ static sl::float4x4 sl_make_identity_matrix()
 	return ret;
 }
 
+static sl::float4x4 sl_convert_matrix(const Projection& mtx) {
+	sl::float4x4 ret;
+	ret.setRow(0, sl::float4(mtx.columns[0].x, mtx.columns[1].x, mtx.columns[2].x, mtx.columns[3].x));
+	ret.setRow(1, sl::float4(mtx.columns[0].y, mtx.columns[1].y, mtx.columns[2].y, mtx.columns[3].y));
+	ret.setRow(2, sl::float4(mtx.columns[0].z, mtx.columns[1].z, mtx.columns[2].z, mtx.columns[3].z));
+	ret.setRow(3, sl::float4(mtx.columns[0].w, mtx.columns[1].w, mtx.columns[2].w, mtx.columns[3].w));
+	return ret;
+}
+
+static sl::float3 sl_convert_vector(const Vector3& vec) {
+	return sl::float3(vec.x, vec.y, vec.z);
+}
+
 void DLSSEffect::upscale(const Parameters &p_params) {
 	DLSSContextInner* context = (DLSSContextInner*)p_params.context;
 
@@ -150,23 +163,28 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 	// Set SL Options
 	{
 		sl::float4x4 mtxIdentity = sl_make_identity_matrix();
-		context->constants.cameraViewToClip = mtxIdentity; // projection mtx (unjittered)
-		context->constants.clipToCameraView = mtxIdentity; // projection mtx (unjittered, inverted)
+		context->constants.cameraViewToClip = sl_convert_matrix(p_params.cam_projection); // projection mtx (unjittered)
+		context->constants.clipToCameraView = sl_convert_matrix(p_params.cam_projection.inverse()); // projection mtx (unjittered, inverted)
 		context->constants.clipToLensClip = mtxIdentity; // keep identity unless some lens distortion is applied
-		context->constants.clipToPrevClip = mtxIdentity; // reprojection matrix
-		context->constants.prevClipToClip = mtxIdentity; // inverted reprojection matrix
+		context->constants.clipToPrevClip = sl_convert_matrix(p_params.reprojection); // reprojection matrix
+		context->constants.prevClipToClip = sl_convert_matrix(p_params.reprojection.inverse()); // inverted reprojection matrix
+
+		context->constants.cameraPos = sl_convert_vector(p_params.cam_transform.get_origin());
+		context->constants.cameraFwd = sl_convert_vector(p_params.cam_transform.get_basis().rows[0]);
+		context->constants.cameraUp = sl_convert_vector(p_params.cam_transform.get_basis().rows[1]);
+		context->constants.cameraRight = sl_convert_vector(p_params.cam_transform.get_basis().rows[2]);
 
 		context->constants.cameraNear = p_params.z_near;
 		context->constants.cameraFar = p_params.z_far;
 		context->constants.cameraFOV = p_params.fovy;
-		context->constants.cameraMotionIncluded = sl::Boolean::eTrue;
+		context->constants.cameraMotionIncluded = sl::Boolean::eFalse;
 		context->constants.cameraAspectRatio = context->currentDlssOptions.outputWidth / context->currentDlssOptions.outputHeight;
 		context->constants.cameraPinholeOffset = sl::float2(0.0f, 0.0f);
 		context->constants.depthInverted = sl::Boolean::eTrue;
 		context->constants.motionVectors3D = sl::Boolean::eFalse;
 		context->constants.motionVectorsDilated = sl::Boolean::eFalse;
 		context->constants.motionVectorsJittered = sl::Boolean::eFalse;
-		context->constants.motionVectorsInvalidValue = sl::Boolean::eFalse;
+		context->constants.motionVectorsInvalidValue = -1.0f;
 		context->constants.jitterOffset = sl::float2(p_params.jitter.x, p_params.jitter.y);
 		context->constants.mvecScale = sl::float2(1.0f, 1.0f);
 		context->constants.orthographicProjection = sl::Boolean::eFalse;

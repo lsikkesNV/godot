@@ -2265,6 +2265,8 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				const Transform3D &prev_transform = p_render_data->scene_data->prev_cam_transform;
 				const Transform3D &cur_transform = p_render_data->scene_data->cam_transform;
 				params.reprojection = prev_proj.flipped_y() * prev_transform.affine_inverse() * cur_transform * cur_proj.flipped_y().inverse();
+				params.cam_projection = cur_proj;
+				params.cam_transform = cur_transform;
 
 				dlss_effect->upscale(params);
 			}
