@@ -52,9 +52,12 @@
 #endif
 
 class VulkanContext;
+class StreamlineContext;
 
 class RenderingDeviceVulkan : public RenderingDevice {
 	_THREAD_SAFE_CLASS_
+
+	friend class StreamlineContext;
 
 	// Miscellaneous tables that map
 	// our enums to enums used

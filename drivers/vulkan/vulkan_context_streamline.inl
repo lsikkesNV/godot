@@ -43,6 +43,8 @@ public:
 	void reflex_get_state(sl::ReflexState& reflexState);
 	sl::FrameToken* get_frame_token();
 
+	unsigned long long convert_rdformat_to_vkformat(RenderingDevice::DataFormat format);
+
 	static StreamlineContext &get();
 
 	sl::FrameToken* last_token = nullptr;
@@ -71,7 +73,7 @@ void StreamlineContext::load_functions() {
 	this->slIsFeatureSupported = (PFun_slIsFeatureSupported *)GetProcAddress(streamline, "slIsFeatureSupported");
 	this->slGetFeatureFunction = (PFun_slGetFeatureFunction *)GetProcAddress(streamline, "slGetFeatureFunction");
 	this->slGetNewFrameToken = (PFun_slGetNewFrameToken *)GetProcAddress(streamline, "slGetNewFrameToken");
-	
+
 	this->slAllocateResources = (PFun_slAllocateResources *)GetProcAddress(streamline, "slAllocateResources");
 	this->slFreeResources = (PFun_slFreeResources *)GetProcAddress(streamline, "slFreeResources");
 	this->slEvaluateFeature = (PFun_slEvaluateFeature *)GetProcAddress(streamline, "slEvaluateFeature");
@@ -206,7 +208,7 @@ void VulkanContext::streamline_initialize() {
 	}
 
 	sl::Preferences pref;
-    sl::Feature featuresToLoad[] = { 
+    sl::Feature featuresToLoad[] = {
         sl::kFeatureDLSS,
         sl::kFeatureDLSS_G,
         sl::kFeatureReflex
@@ -275,7 +277,7 @@ void VulkanContext::set_nvidia_parameter(RenderingDevice::NvidiaParameter parame
 				newMode = sl::ReflexMode::eLowLatency;
 			else
 				newMode = sl::ReflexMode::eOff;
-			
+
 			if (StreamlineContext::get().reflex_options.mode != newMode)
 				StreamlineContext::get().reflex_options_dirty = true;
 			StreamlineContext::get().reflex_options.mode = newMode;
@@ -312,7 +314,7 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 			streamline_framemarker = StreamlineContext::get().get_frame_token();
 			if (StreamlineContext::get().reflex_options.mode != sl::ReflexMode::eOff || StreamlineContext::get().reflex_options.frameLimitUs > 0)
 				StreamlineContext::get().reflex_sleep((sl::FrameToken *)streamline_framemarker);
-			sl_marker = sl::ReflexMarker::eInputSample; 
+			sl_marker = sl::ReflexMarker::eInputSample;
 
 			break;
 		case RenderingDevice::BeginRender:
@@ -326,7 +328,7 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 				streamline_emit(RenderingDevice::PcPing);
 			}
 
-			sl_marker = sl::ReflexMarker::eSimulationStart; 
+			sl_marker = sl::ReflexMarker::eSimulationStart;
 			break;
 		case RenderingDevice::EndSimulation:
 			sl_marker = sl::ReflexMarker::eSimulationEnd; break;
@@ -343,3 +345,12 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 }
 
 #endif // STREAMLINE_IMPLEMENTATION
+
+#ifdef STREAMLINE_RD_IMPLEMENTATION
+
+unsigned long long StreamlineContext::convert_rdformat_to_vkformat(RenderingDevice::DataFormat format)
+{
+	return RenderingDeviceVulkan::vulkan_formats[(int)format];
+}
+
+#endif // STREAMLINE_RD_IMPLEMENTATION

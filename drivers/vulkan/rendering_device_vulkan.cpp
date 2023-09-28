@@ -41,6 +41,9 @@
 
 #include "thirdparty/misc/smolv.h"
 
+#define STREAMLINE_RD_IMPLEMENTATION
+#include "vulkan_context_streamline.inl"
+
 //#define FORCE_FULL_BARRIER
 
 static const uint32_t SMALL_ALLOCATION_MAX_SIZE = 4096;
