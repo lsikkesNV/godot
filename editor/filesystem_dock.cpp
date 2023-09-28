@@ -1363,7 +1363,7 @@ void FileSystemDock::_get_all_items_in_dir(EditorFileSystemDirectory *p_efsd, Ve
 	}
 }
 
-void FileSystemDock::_find_remaps(EditorFileSystemDirectory *p_efsd, const HashMap<String, String> &r_renames, Vector<String> &r_to_remaps) const {
+void FileSystemDock::_find_remaps(EditorFileSystemDirectory *p_efsd, const Vector<String> &r_renames, Vector<String> &r_to_remaps) const {
 	for (int i = 0; i < p_efsd->get_subdir_count(); i++) {
 		_find_remaps(p_efsd->get_subdir(i), r_renames, r_to_remaps);
 	}
@@ -1516,6 +1516,8 @@ void FileSystemDock::_try_duplicate_item(const FileOrFolder &p_item, const Strin
 	} else {
 		// Recursively duplicate all files inside the folder.
 		Ref<DirAccess> old_dir = DirAccess::open(old_path);
+		ERR_FAIL_COND(old_dir.is_null());
+
 		Ref<FileAccess> file_access = FileAccess::create(FileAccess::ACCESS_RESOURCES);
 		old_dir->set_include_navigational(false);
 		old_dir->list_dir_begin();
@@ -1533,7 +1535,12 @@ void FileSystemDock::_try_duplicate_item(const FileOrFolder &p_item, const Strin
 	}
 }
 
-void FileSystemDock::_update_resource_paths_after_move(const HashMap<String, String> &p_renames) const {
+void FileSystemDock::_update_resource_paths_after_move(const HashMap<String, String> &p_renames, const HashMap<String, ResourceUID::ID> &p_uids) const {
+	// Update the paths in ResourceUID, so that UIDs remain valid.
+	for (const KeyValue<String, ResourceUID::ID> &pair : p_uids) {
+		ResourceUID::get_singleton()->set_id(pair.value, p_renames[pair.key]);
+	}
+
 	// Rename all resources loaded, be it subresources or actual resources.
 	List<Ref<Resource>> cached;
 	ResourceCache::get_cached_resources(&cached);
@@ -1553,53 +1560,33 @@ void FileSystemDock::_update_resource_paths_after_move(const HashMap<String, Str
 
 		r->set_path(base_path + extra_path);
 	}
-
-	for (int i = 0; i < EditorNode::get_editor_data().get_edited_scene_count(); i++) {
-		String file_path;
-		if (i == EditorNode::get_editor_data().get_edited_scene()) {
-			if (!get_tree()->get_edited_scene_root()) {
-				continue;
-			}
-
-			file_path = get_tree()->get_edited_scene_root()->get_scene_file_path();
-		} else {
-			file_path = EditorNode::get_editor_data().get_scene_path(i);
-		}
-
-		if (p_renames.has(file_path)) {
-			file_path = p_renames[file_path];
-		}
-
-		if (i == EditorNode::get_editor_data().get_edited_scene()) {
-			get_tree()->get_edited_scene_root()->set_scene_file_path(file_path);
-		} else {
-			EditorNode::get_editor_data().set_scene_path(i, file_path);
-		}
-	}
 }
 
-void FileSystemDock::_update_dependencies_after_move(const HashMap<String, String> &p_renames) const {
+void FileSystemDock::_update_dependencies_after_move(const HashMap<String, String> &p_renames, const Vector<String> &p_remaps) const {
 	// The following code assumes that the following holds:
 	// 1) EditorFileSystem contains the old paths/folder structure from before the rename/move.
 	// 2) ResourceLoader can use the new paths without needing to call rescan.
-	Vector<String> remaps;
-	_find_remaps(EditorFileSystem::get_singleton()->get_filesystem(), p_renames, remaps);
-	for (int i = 0; i < remaps.size(); ++i) {
+	List<String> scenes_to_reload;
+	for (int i = 0; i < p_remaps.size(); ++i) {
 		// Because we haven't called a rescan yet the found remap might still be an old path itself.
-		String file = p_renames.has(remaps[i]) ? p_renames[remaps[i]] : remaps[i];
+		String file = p_renames.has(p_remaps[i]) ? p_renames[p_remaps[i]] : p_remaps[i];
 		print_verbose("Remapping dependencies for: " + file);
 		Error err = ResourceLoader::rename_dependencies(file, p_renames);
 		if (err == OK) {
 			if (ResourceLoader::get_resource_type(file) == "PackedScene") {
-				callable_mp(EditorNode::get_singleton(), &EditorNode::reload_scene).bind(file).call_deferred();
+				scenes_to_reload.push_back(file);
 			}
 		} else {
-			EditorNode::get_singleton()->add_io_error(TTR("Unable to update dependencies:") + "\n" + remaps[i] + "\n");
+			EditorNode::get_singleton()->add_io_error(TTR("Unable to update dependencies:") + "\n" + p_remaps[i] + "\n");
 		}
+	}
+
+	for (const String &E : scenes_to_reload) {
+		EditorNode::get_singleton()->reload_scene(E);
 	}
 }
 
-void FileSystemDock::_update_project_settings_after_move(const HashMap<String, String> &p_renames) const {
+void FileSystemDock::_update_project_settings_after_move(const HashMap<String, String> &p_renames, const HashMap<String, String> &p_folders_renames) {
 	// Find all project settings of type FILE and replace them if needed.
 	const HashMap<StringName, PropertyInfo> prop_info = ProjectSettings::get_singleton()->get_custom_property_info();
 	for (const KeyValue<StringName, PropertyInfo> &E : prop_info) {
@@ -1625,6 +1612,14 @@ void FileSystemDock::_update_project_settings_after_move(const HashMap<String, S
 			} else if (autoload.begins_with("*") && p_renames.has(autoload_singleton)) {
 				ProjectSettings::get_singleton()->set_setting(E.name, "*" + p_renames[autoload_singleton]);
 			}
+		}
+	}
+
+	// Update folder colors.
+	for (const KeyValue<String, String> &rename : p_folders_renames) {
+		if (assigned_folder_colors.has(rename.key)) {
+			assigned_folder_colors[rename.value] = assigned_folder_colors[rename.key];
+			assigned_folder_colors.erase(rename.key);
 		}
 	}
 	ProjectSettings::get_singleton()->save();
@@ -1670,21 +1665,6 @@ void FileSystemDock::_update_favorites_list_after_move(const HashMap<String, Str
 	EditorSettings::get_singleton()->set_favorites(new_favorites);
 }
 
-void FileSystemDock::_save_scenes_after_move(const HashMap<String, String> &p_renames) const {
-	Vector<String> remaps;
-	_find_remaps(EditorFileSystem::get_singleton()->get_filesystem(), p_renames, remaps);
-	Vector<String> new_filenames;
-
-	for (int i = 0; i < remaps.size(); ++i) {
-		String file = p_renames.has(remaps[i]) ? p_renames[remaps[i]] : remaps[i];
-		if (ResourceLoader::get_resource_type(file) == "PackedScene") {
-			new_filenames.push_back(file);
-		}
-	}
-
-	EditorNode::get_singleton()->save_scene_list(new_filenames);
-}
-
 void FileSystemDock::_make_scene_confirm() {
 	const String scene_path = make_scene_dialog->get_scene_path();
 
@@ -1719,6 +1699,11 @@ void FileSystemDock::_folder_removed(String p_folder) {
 	Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
 	while (!da->dir_exists(current_path)) {
 		current_path = current_path.get_base_dir();
+	}
+
+	if (assigned_folder_colors.has(p_folder)) {
+		assigned_folder_colors.erase(p_folder);
+		_update_folder_colors_setting();
 	}
 
 	current_path_line_edit->set_text(current_path);
@@ -1788,24 +1773,25 @@ void FileSystemDock::_rename_operation_confirm() {
 		return;
 	}
 
+	Vector<String> old_paths;
+	HashMap<String, ResourceUID::ID> uids;
+	Vector<String> remaps;
+	_before_move(old_paths, uids, remaps);
+
 	HashMap<String, String> file_renames;
 	HashMap<String, String> folder_renames;
 	_try_move_item(to_rename, new_path, file_renames, folder_renames);
 
 	int current_tab = EditorSceneTabs::get_singleton()->get_current_tab();
-	_save_scenes_after_move(file_renames); // save scenes before updating
-	_update_dependencies_after_move(file_renames);
-	_update_resource_paths_after_move(file_renames);
-	_update_project_settings_after_move(file_renames);
+	_update_resource_paths_after_move(file_renames, uids);
+	_update_dependencies_after_move(file_renames, remaps);
+	_update_project_settings_after_move(file_renames, folder_renames);
 	_update_favorites_list_after_move(file_renames, folder_renames);
 
 	EditorSceneTabs::get_singleton()->set_current_tab(current_tab);
 
 	print_verbose("FileSystem: calling rescan.");
 	_rescan();
-
-	print_verbose("FileSystem: saving moved scenes.");
-	_save_scenes_after_move(file_renames);
 
 	current_path = new_path;
 	current_path_line_edit->set_text(current_path);
@@ -1924,6 +1910,11 @@ void FileSystemDock::_move_operation_confirm(const String &p_to_path, bool p_cop
 			}
 		}
 
+		Vector<String> old_paths;
+		HashMap<String, ResourceUID::ID> uids;
+		Vector<String> remaps;
+		_before_move(old_paths, uids, remaps);
+
 		bool is_moved = false;
 		HashMap<String, String> file_renames;
 		HashMap<String, String> folder_renames;
@@ -1944,10 +1935,9 @@ void FileSystemDock::_move_operation_confirm(const String &p_to_path, bool p_cop
 
 		if (is_moved) {
 			int current_tab = EditorSceneTabs::get_singleton()->get_current_tab();
-			_save_scenes_after_move(file_renames); // Save scenes before updating.
-			_update_dependencies_after_move(file_renames);
-			_update_resource_paths_after_move(file_renames);
-			_update_project_settings_after_move(file_renames);
+			_update_resource_paths_after_move(file_renames, uids);
+			_update_dependencies_after_move(file_renames, remaps);
+			_update_project_settings_after_move(file_renames, folder_renames);
 			_update_favorites_list_after_move(file_renames, folder_renames);
 
 			EditorSceneTabs::get_singleton()->set_current_tab(current_tab);
@@ -1955,13 +1945,26 @@ void FileSystemDock::_move_operation_confirm(const String &p_to_path, bool p_cop
 			print_verbose("FileSystem: calling rescan.");
 			_rescan();
 
-			print_verbose("FileSystem: saving moved scenes.");
-			_save_scenes_after_move(file_renames);
-
 			current_path = p_to_path;
 			current_path_line_edit->set_text(current_path);
 		}
 	}
+}
+
+void FileSystemDock::_before_move(Vector<String> &r_old_paths, HashMap<String, ResourceUID::ID> &r_uids, Vector<String> &r_remaps) const {
+	for (int i = 0; i < to_move.size(); i++) {
+		r_old_paths.push_back(to_move[i].path);
+		ResourceUID::ID uid = ResourceLoader::get_resource_uid(to_move[i].path);
+		if (uid != ResourceUID::INVALID_ID) {
+			r_uids[to_move[i].path] = uid;
+		}
+	}
+
+	_find_remaps(EditorFileSystem::get_singleton()->get_filesystem(), r_old_paths, r_remaps);
+
+	// Open scenes with dependencies on the ones about to be moved will be reloaded,
+	// so save them first to prevent losing unsaved changes.
+	EditorNode::get_singleton()->save_scene_list(r_remaps);
 }
 
 Vector<String> FileSystemDock::_tree_get_selected(bool remove_self_inclusion) const {
@@ -1969,15 +1972,15 @@ Vector<String> FileSystemDock::_tree_get_selected(bool remove_self_inclusion) co
 	Vector<String> selected_strings;
 
 	TreeItem *favorites_item = tree->get_root()->get_first_child();
-	TreeItem *active_selected = tree->get_selected();
-	if (active_selected && active_selected != favorites_item) {
-		selected_strings.push_back(active_selected->get_metadata(0));
+	TreeItem *cursor_item = tree->get_selected();
+	if (cursor_item && cursor_item->is_selected(0) && cursor_item != favorites_item) {
+		selected_strings.push_back(cursor_item->get_metadata(0));
 	}
 
 	TreeItem *selected = tree->get_root();
 	selected = tree->get_next_selected(selected);
 	while (selected) {
-		if (selected != active_selected && selected != favorites_item) {
+		if (selected != cursor_item && selected != favorites_item) {
 			selected_strings.push_back(selected->get_metadata(0));
 		}
 		selected = tree->get_next_selected(selected);
@@ -2348,7 +2351,7 @@ void FileSystemDock::_resource_created() {
 
 	ERR_FAIL_COND(!c);
 	Resource *r = Object::cast_to<Resource>(c);
-	ERR_FAIL_COND(!r);
+	ERR_FAIL_NULL(r);
 
 	PackedScene *scene = Object::cast_to<PackedScene>(r);
 	if (scene) {
@@ -2681,7 +2684,7 @@ void FileSystemDock::drop_data_fw(const Point2 &p_point, const Variant &p_data, 
 				}
 			}
 			if (!to_move.is_empty()) {
-				if (Input::get_singleton()->is_key_pressed(Key::CTRL)) {
+				if (Input::get_singleton()->is_key_pressed(Key::CMD_OR_CTRL)) {
 					_move_operation_confirm(to_dir, true);
 				} else {
 					_move_operation_confirm(to_dir);
@@ -2767,6 +2770,15 @@ void FileSystemDock::_get_drag_target_folder(String &target, bool &target_favori
 	}
 }
 
+void FileSystemDock::_update_folder_colors_setting() {
+	if (!ProjectSettings::get_singleton()->has_setting("file_customization/folder_colors")) {
+		ProjectSettings::get_singleton()->set_setting("file_customization/folder_colors", assigned_folder_colors);
+	} else if (assigned_folder_colors.is_empty()) {
+		ProjectSettings::get_singleton()->set_setting("file_customization/folder_colors", Variant());
+	}
+	ProjectSettings::get_singleton()->save();
+}
+
 void FileSystemDock::_folder_color_index_pressed(int p_index, PopupMenu *p_menu) {
 	Variant chosen_color_name = p_menu->get_item_metadata(p_index);
 	Vector<String> selected;
@@ -2797,13 +2809,7 @@ void FileSystemDock::_folder_color_index_pressed(int p_index, PopupMenu *p_menu)
 		}
 	}
 
-	if (!ProjectSettings::get_singleton()->has_setting("file_customization/folder_colors")) {
-		ProjectSettings::get_singleton()->set_setting("file_customization/folder_colors", assigned_folder_colors);
-	} else if (assigned_folder_colors.is_empty()) {
-		ProjectSettings::get_singleton()->set_setting("file_customization/folder_colors", Variant());
-	}
-
-	ProjectSettings::get_singleton()->save();
+	_update_folder_colors_setting();
 
 	_update_tree(get_uncollapsed_paths());
 	_update_file_list(true);
@@ -2909,7 +2915,7 @@ void FileSystemDock::_file_and_folders_fill_popup(PopupMenu *p_popup, Vector<Str
 
 			p_popup->add_child(folder_colors_menu);
 			p_popup->add_submenu_item(TTR("Set Folder Color..."), "FolderColor");
-			p_popup->set_item_icon(-1, get_editor_theme_icon(SNAME("CanvasItem")));
+			p_popup->set_item_icon(-1, get_editor_theme_icon(SNAME("Paint")));
 
 			folder_colors_menu->add_icon_item(get_editor_theme_icon(SNAME("Folder")), TTR("Default (Reset)"));
 			folder_colors_menu->set_item_icon_modulate(0, get_theme_color(SNAME("folder_icon_color"), SNAME("FileDialog")));
@@ -3304,6 +3310,8 @@ bool FileSystemDock::_get_imported_files(const String &p_path, String &r_extensi
 	}
 
 	Ref<DirAccess> da = DirAccess::open(p_path);
+	ERR_FAIL_COND_V(da.is_null(), false);
+
 	da->list_dir_begin();
 	String n = da->get_next();
 	while (!n.is_empty()) {

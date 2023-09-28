@@ -29,8 +29,8 @@
 /**************************************************************************/
 
 #include "render_scene_buffers_rd.h"
+#include "core/config/project_settings.h"
 #include "servers/rendering/renderer_rd/renderer_scene_render_rd.h"
-#include "servers/rendering/renderer_rd/storage_rd/material_storage.h"
 #include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
 
 RenderSceneBuffersRD::RenderSceneBuffersRD() {
@@ -40,6 +40,8 @@ RenderSceneBuffersRD::~RenderSceneBuffersRD() {
 	cleanup();
 
 	data_buffers.clear();
+
+	RendererRD::MaterialStorage::get_singleton()->samplers_rd_free(samplers);
 }
 
 void RenderSceneBuffersRD::_bind_methods() {
@@ -91,6 +93,27 @@ void RenderSceneBuffersRD::free_named_texture(NamedTexture &p_named_texture) {
 	p_named_texture.slices.clear(); // slices should be freed automatically as dependents...
 }
 
+void RenderSceneBuffersRD::update_samplers() {
+	float computed_mipmap_bias = texture_mipmap_bias;
+
+	if (use_taa || (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2 || scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS )) {
+		// Use negative mipmap LOD bias when TAA, FSR2 or DLSS is enabled to compensate for loss of sharpness.
+		// This restores sharpness in still images to be roughly at the same level as without TAA,
+		// but moving scenes will still be blurrier.
+		computed_mipmap_bias -= 0.5;
+	}
+
+	if (screen_space_aa == RS::VIEWPORT_SCREEN_SPACE_AA_FXAA) {
+		// Use negative mipmap LOD bias when FXAA is enabled to compensate for loss of sharpness.
+		// If both TAA and FXAA are enabled, combine their negative LOD biases together.
+		computed_mipmap_bias -= 0.25;
+	}
+
+	RendererRD::MaterialStorage *material_storage = RendererRD::MaterialStorage::get_singleton();
+	material_storage->samplers_rd_free(samplers);
+	samplers = material_storage->samplers_rd_allocate(computed_mipmap_bias);
+}
+
 void RenderSceneBuffersRD::cleanup() {
 	// Free our data buffers (but don't destroy them)
 	for (KeyValue<StringName, Ref<RenderBufferCustomDataRD>> &E : data_buffers) {
@@ -106,7 +129,6 @@ void RenderSceneBuffersRD::cleanup() {
 
 void RenderSceneBuffersRD::configure(const RenderSceneBuffersConfiguration *p_config) {
 	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
-	RendererRD::MaterialStorage *material_storage = RendererRD::MaterialStorage::get_singleton();
 
 	render_target = p_config->get_render_target();
 	target_size = p_config->get_target_size();
@@ -124,33 +146,10 @@ void RenderSceneBuffersRD::configure(const RenderSceneBuffersConfiguration *p_co
 
 	ERR_FAIL_COND_MSG(view_count == 0, "Must have at least 1 view");
 
-	if (use_taa) {
-		// Use negative mipmap LOD bias when TAA is enabled to compensate for loss of sharpness.
-		// This restores sharpness in still images to be roughly at the same level as without TAA,
-		// but moving scenes will still be blurrier.
-		texture_mipmap_bias -= 0.5;
-	}
+	update_samplers();
 
-	if (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2) {
-		// Same reasoning as TAA, except AMD recommends this bias instead.
-		texture_mipmap_bias -= 1.0;
-	}
-
-	if (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_DLSS) {
-		// NVIDIA: Could be improved, but -1.0 is a decent option. Ideally for 0.5 scale you'd go -2 mip bias, -2.5 for 0.33.
-		texture_mipmap_bias -= 1.0;
-	}
-
-	if (screen_space_aa == RS::VIEWPORT_SCREEN_SPACE_AA_FXAA) {
-		// Use negative mipmap LOD bias when FXAA is enabled to compensate for loss of sharpness.
-		// If both TAA and FXAA are enabled, combine their negative LOD biases together.
-		texture_mipmap_bias -= 0.25;
-	}
-
-	material_storage->sampler_rd_configure_custom(texture_mipmap_bias);
-
-	// need to check if we really need to do this here..
-	RendererSceneRenderRD::get_singleton()->update_uniform_sets();
+	// Notify the renderer the base uniform needs to be recreated.
+	RendererSceneRenderRD::get_singleton()->base_uniforms_changed();
 
 	// cleanout any old buffers we had.
 	cleanup();
@@ -254,8 +253,9 @@ void RenderSceneBuffersRD::set_fsr_sharpness(float p_fsr_sharpness) {
 }
 
 void RenderSceneBuffersRD::set_texture_mipmap_bias(float p_texture_mipmap_bias) {
-	RendererRD::MaterialStorage *material_storage = RendererRD::MaterialStorage::get_singleton();
-	material_storage->sampler_rd_configure_custom(p_texture_mipmap_bias);
+	texture_mipmap_bias = p_texture_mipmap_bias;
+
+	update_samplers();
 }
 
 void RenderSceneBuffersRD::set_use_debanding(bool p_use_debanding) {
@@ -499,7 +499,13 @@ void RenderSceneBuffersRD::allocate_blur_textures() {
 		return;
 	}
 
-	uint32_t mipmaps_required = Image::get_image_required_mipmaps(internal_size.x, internal_size.y, Image::FORMAT_RGBAH);
+	Size2i blur_size = internal_size;
+	if (scaling_3d_mode == RS::VIEWPORT_SCALING_3D_MODE_FSR2) {
+		// The blur texture should be as big as the target size when using an upscaler.
+		blur_size = target_size;
+	}
+
+	uint32_t mipmaps_required = Image::get_image_required_mipmaps(blur_size.x, blur_size.y, Image::FORMAT_RGBAH);
 
 	uint32_t usage_bits = RD::TEXTURE_USAGE_SAMPLING_BIT | RD::TEXTURE_USAGE_CAN_COPY_TO_BIT;
 	if (can_be_storage) {
@@ -508,12 +514,12 @@ void RenderSceneBuffersRD::allocate_blur_textures() {
 		usage_bits += RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT;
 	}
 
-	create_texture(RB_SCOPE_BUFFERS, RB_TEX_BLUR_0, base_data_format, usage_bits, RD::TEXTURE_SAMPLES_1, internal_size, view_count, mipmaps_required);
-	create_texture(RB_SCOPE_BUFFERS, RB_TEX_BLUR_1, base_data_format, usage_bits, RD::TEXTURE_SAMPLES_1, Size2i(internal_size.x >> 1, internal_size.y >> 1), view_count, mipmaps_required - 1);
+	create_texture(RB_SCOPE_BUFFERS, RB_TEX_BLUR_0, base_data_format, usage_bits, RD::TEXTURE_SAMPLES_1, blur_size, view_count, mipmaps_required);
+	create_texture(RB_SCOPE_BUFFERS, RB_TEX_BLUR_1, base_data_format, usage_bits, RD::TEXTURE_SAMPLES_1, Size2i(blur_size.x >> 1, blur_size.y >> 1), view_count, mipmaps_required - 1);
 
 	// if !can_be_storage we need a half width version
 	if (!can_be_storage) {
-		create_texture(RB_SCOPE_BUFFERS, RB_TEX_HALF_BLUR, base_data_format, usage_bits, RD::TEXTURE_SAMPLES_1, Size2i(internal_size.x >> 1, internal_size.y), 1, mipmaps_required);
+		create_texture(RB_SCOPE_BUFFERS, RB_TEX_HALF_BLUR, base_data_format, usage_bits, RD::TEXTURE_SAMPLES_1, Size2i(blur_size.x >> 1, blur_size.y), 1, mipmaps_required);
 	}
 
 	// TODO redo this:
@@ -522,8 +528,8 @@ void RenderSceneBuffersRD::allocate_blur_textures() {
 
 		RD::TextureFormat tf;
 		tf.format = RD::DATA_FORMAT_R16_SFLOAT; // We could probably use DATA_FORMAT_R8_SNORM if we don't pre-multiply by blur_size but that depends on whether we can remove DEPTH_GAP
-		tf.width = internal_size.x;
-		tf.height = internal_size.y;
+		tf.width = blur_size.x;
+		tf.height = blur_size.y;
 		tf.texture_type = RD::TEXTURE_TYPE_2D;
 		tf.array_layers = 1; // Our DOF effect handles one eye per turn
 		tf.usage_bits = RD::TEXTURE_USAGE_SAMPLING_BIT | RD::TEXTURE_USAGE_CAN_COPY_TO_BIT | RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -640,7 +646,7 @@ void RenderSceneBuffersRD::ensure_velocity() {
 		uint32_t usage_bits = RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_SAMPLING_BIT | RD::TEXTURE_USAGE_STORAGE_BIT;
 
 		if (msaa_3d != RS::VIEWPORT_MSAA_DISABLED) {
-			uint32_t msaa_usage_bits = usage_bits | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT;
+			uint32_t msaa_usage_bits = RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT;
 			usage_bits |= RD::TEXTURE_USAGE_CAN_COPY_TO_BIT;
 
 			create_texture(RB_SCOPE_BUFFERS, RB_TEX_VELOCITY_MSAA, RD::DATA_FORMAT_R16G16_SFLOAT, msaa_usage_bits, texture_samples);

@@ -111,11 +111,11 @@ void AnimationPlayerEditor::_notification(int p_what) {
 
 			get_tree()->connect("node_removed", callable_mp(this, &AnimationPlayerEditor::_node_removed));
 
-			add_theme_style_override("panel", EditorNode::get_singleton()->get_gui_base()->get_theme_stylebox(SNAME("panel"), SNAME("Panel")));
+			add_theme_style_override("panel", EditorNode::get_singleton()->get_editor_theme()->get_stylebox(SNAME("panel"), SNAME("Panel")));
 		} break;
 
 		case EditorSettings::NOTIFICATION_EDITOR_SETTINGS_CHANGED: {
-			add_theme_style_override("panel", EditorNode::get_singleton()->get_gui_base()->get_theme_stylebox(SNAME("panel"), SNAME("Panel")));
+			add_theme_style_override("panel", EditorNode::get_singleton()->get_editor_theme()->get_stylebox(SNAME("panel"), SNAME("Panel")));
 		} break;
 
 		case NOTIFICATION_TRANSLATION_CHANGED:
@@ -1682,27 +1682,27 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	add_child(hb);
 
 	play_bw_from = memnew(Button);
-	play_bw_from->set_flat(true);
+	play_bw_from->set_theme_type_variation("FlatButton");
 	play_bw_from->set_tooltip_text(TTR("Play selected animation backwards from current pos. (A)"));
 	hb->add_child(play_bw_from);
 
 	play_bw = memnew(Button);
-	play_bw->set_flat(true);
+	play_bw->set_theme_type_variation("FlatButton");
 	play_bw->set_tooltip_text(TTR("Play selected animation backwards from end. (Shift+A)"));
 	hb->add_child(play_bw);
 
 	stop = memnew(Button);
-	stop->set_flat(true);
+	stop->set_theme_type_variation("FlatButton");
 	hb->add_child(stop);
 	stop->set_tooltip_text(TTR("Pause/stop animation playback. (S)"));
 
 	play = memnew(Button);
-	play->set_flat(true);
+	play->set_theme_type_variation("FlatButton");
 	play->set_tooltip_text(TTR("Play selected animation from start. (Shift+D)"));
 	hb->add_child(play);
 
 	play_from = memnew(Button);
-	play_from->set_flat(true);
+	play_from->set_theme_type_variation("FlatButton");
 	play_from->set_tooltip_text(TTR("Play selected animation from current pos. (D)"));
 	hb->add_child(play_from);
 
@@ -1753,7 +1753,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	animation->set_auto_translate(false);
 
 	autoplay = memnew(Button);
-	autoplay->set_flat(true);
+	autoplay->set_theme_type_variation("FlatButton");
 	hb->add_child(autoplay);
 	autoplay->set_tooltip_text(TTR("Autoplay on Load"));
 
@@ -1766,7 +1766,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	hb->add_child(memnew(VSeparator));
 
 	onion_toggle = memnew(Button);
-	onion_toggle->set_flat(true);
+	onion_toggle->set_theme_type_variation("FlatButton");
 	onion_toggle->set_toggle_mode(true);
 	onion_toggle->set_tooltip_text(TTR("Enable Onion Skinning"));
 	onion_toggle->connect("pressed", callable_mp(this, &AnimationPlayerEditor::_onion_skinning_menu).bind(ONION_SKINNING_ENABLE));
@@ -1804,7 +1804,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	hb->add_child(memnew(VSeparator));
 
 	pin = memnew(Button);
-	pin->set_flat(true);
+	pin->set_theme_type_variation("FlatButton");
 	pin->set_toggle_mode(true);
 	pin->set_tooltip_text(TTR("Pin AnimationPlayer"));
 	hb->add_child(pin);
@@ -2013,7 +2013,7 @@ bool EditorInspectorPluginAnimationTrackKeyEdit::can_handle(Object *p_object) {
 
 void EditorInspectorPluginAnimationTrackKeyEdit::parse_begin(Object *p_object) {
 	AnimationTrackKeyEdit *atk = Object::cast_to<AnimationTrackKeyEdit>(p_object);
-	ERR_FAIL_COND(!atk);
+	ERR_FAIL_NULL(atk);
 
 	atk_editor = memnew(AnimationTrackKeyEditEditor(atk->animation, atk->track, atk->key_ofs, atk->use_fps));
 	add_custom_control(atk_editor);

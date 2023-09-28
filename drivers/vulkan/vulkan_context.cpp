@@ -782,6 +782,7 @@ Error VulkanContext::_check_capabilities() {
 			VkPhysicalDeviceFragmentShadingRateFeaturesKHR vrs_features = {};
 			VkPhysicalDevice16BitStorageFeaturesKHR storage_feature = {};
 			VkPhysicalDeviceMultiviewFeatures multiview_features = {};
+			VkPhysicalDevicePipelineCreationCacheControlFeatures pipeline_cache_control_features = {};
 
 			if (device_api_version >= VK_API_VERSION_1_2) {
 				device_features_vk12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -833,6 +834,15 @@ Error VulkanContext::_check_capabilities() {
 				next = &multiview_features;
 			}
 
+			if (is_device_extension_enabled(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME)) {
+				pipeline_cache_control_features = {
+					/*sType*/ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES,
+					/*pNext*/ next,
+					/*pipelineCreationCacheControl*/ false,
+				};
+				next = &pipeline_cache_control_features;
+			}
+
 			VkPhysicalDeviceFeatures2 device_features;
 			device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 			device_features.pNext = next;
@@ -872,6 +882,10 @@ Error VulkanContext::_check_capabilities() {
 				storage_buffer_capabilities.uniform_and_storage_buffer_16_bit_access_is_supported = storage_feature.uniformAndStorageBuffer16BitAccess;
 				storage_buffer_capabilities.storage_push_constant_16_is_supported = storage_feature.storagePushConstant16;
 				storage_buffer_capabilities.storage_input_output_16 = storage_feature.storageInputOutput16;
+			}
+
+			if (is_device_extension_enabled(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME)) {
+				pipeline_cache_control_support = pipeline_cache_control_features.pipelineCreationCacheControl;
 			}
 		}
 
@@ -1455,6 +1469,16 @@ Error VulkanContext::_create_device() {
 		nextptr = &vrs_features;
 	}
 
+	VkPhysicalDevicePipelineCreationCacheControlFeatures pipeline_cache_control_features = {};
+	if (pipeline_cache_control_support) {
+		pipeline_cache_control_features.sType =
+				VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES;
+		pipeline_cache_control_features.pNext = nextptr;
+		pipeline_cache_control_features.pipelineCreationCacheControl = pipeline_cache_control_support;
+
+		nextptr = &pipeline_cache_control_features;
+	}
+
 	VkPhysicalDeviceVulkan11Features vulkan11features = {};
 	VkPhysicalDevice16BitStorageFeaturesKHR storage_feature = {};
 	VkPhysicalDeviceMultiviewFeatures multiview_features = {};
@@ -1873,7 +1897,7 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 	err = fpGetPhysicalDeviceSurfacePresentModesKHR(gpu, window->surface, &presentModeCount, nullptr);
 	ERR_FAIL_COND_V(err, ERR_CANT_CREATE);
 	VkPresentModeKHR *presentModes = (VkPresentModeKHR *)malloc(presentModeCount * sizeof(VkPresentModeKHR));
-	ERR_FAIL_COND_V(!presentModes, ERR_CANT_CREATE);
+	ERR_FAIL_NULL_V(presentModes, ERR_CANT_CREATE);
 	err = fpGetPhysicalDeviceSurfacePresentModesKHR(gpu, window->surface, &presentModeCount, presentModes);
 	if (err) {
 		free(presentModes);
@@ -2048,7 +2072,7 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 	}
 
 	VkImage *swapchainImages = (VkImage *)malloc(swapchainImageCount * sizeof(VkImage));
-	ERR_FAIL_COND_V(!swapchainImages, ERR_CANT_CREATE);
+	ERR_FAIL_NULL_V(swapchainImages, ERR_CANT_CREATE);
 	err = fpGetSwapchainImagesKHR(device, window->swapchain, &swapchainImageCount, swapchainImages);
 	if (err) {
 		free(swapchainImages);

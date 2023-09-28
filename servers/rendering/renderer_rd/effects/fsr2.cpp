@@ -40,8 +40,8 @@ using namespace RendererRD;
 #define wcscpy_s wcscpy
 #endif
 
-RD::TextureType ffx_resource_type_to_rd_texture_type(FfxResourceType t) {
-	switch (t) {
+static RD::TextureType ffx_resource_type_to_rd_texture_type(FfxResourceType p_type) {
+	switch (p_type) {
 		case FFX_RESOURCE_TYPE_TEXTURE1D:
 			return RD::TEXTURE_TYPE_1D;
 		case FFX_RESOURCE_TYPE_TEXTURE2D:
@@ -53,8 +53,8 @@ RD::TextureType ffx_resource_type_to_rd_texture_type(FfxResourceType t) {
 	}
 }
 
-FfxResourceType rd_texture_type_to_ffx_resource_type(RD::TextureType t) {
-	switch (t) {
+static FfxResourceType rd_texture_type_to_ffx_resource_type(RD::TextureType p_type) {
+	switch (p_type) {
 		case RD::TEXTURE_TYPE_1D:
 			return FFX_RESOURCE_TYPE_TEXTURE1D;
 		case RD::TEXTURE_TYPE_2D:
@@ -66,8 +66,8 @@ FfxResourceType rd_texture_type_to_ffx_resource_type(RD::TextureType t) {
 	}
 }
 
-RD::DataFormat ffx_surface_format_to_rd_format(FfxSurfaceFormat f) {
-	switch (f) {
+static RD::DataFormat ffx_surface_format_to_rd_format(FfxSurfaceFormat p_format) {
+	switch (p_format) {
 		case FFX_SURFACE_FORMAT_R32G32B32A32_TYPELESS:
 			return RD::DATA_FORMAT_R32G32B32A32_SFLOAT;
 		case FFX_SURFACE_FORMAT_R32G32B32A32_FLOAT:
@@ -111,8 +111,8 @@ RD::DataFormat ffx_surface_format_to_rd_format(FfxSurfaceFormat f) {
 	}
 }
 
-FfxSurfaceFormat rd_format_to_ffx_surface_format(RD::DataFormat f) {
-	switch (f) {
+static FfxSurfaceFormat rd_format_to_ffx_surface_format(RD::DataFormat p_format) {
+	switch (p_format) {
 		case RD::DATA_FORMAT_R32G32B32A32_SFLOAT:
 			return FFX_SURFACE_FORMAT_R32G32B32A32_FLOAT;
 		case RD::DATA_FORMAT_R16G16B16A16_SFLOAT:
@@ -152,14 +152,14 @@ FfxSurfaceFormat rd_format_to_ffx_surface_format(RD::DataFormat f) {
 	}
 }
 
-uint32_t ffx_usage_to_rd_usage_flags(uint32_t flags) {
+static uint32_t ffx_usage_to_rd_usage_flags(uint32_t p_flags) {
 	uint32_t ret = RD::TEXTURE_USAGE_SAMPLING_BIT | RD::TEXTURE_USAGE_CAN_UPDATE_BIT;
 
-	if (flags & FFX_RESOURCE_USAGE_RENDERTARGET) {
+	if (p_flags & FFX_RESOURCE_USAGE_RENDERTARGET) {
 		ret |= RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT;
 	}
 
-	if (flags & FFX_RESOURCE_USAGE_UAV) {
+	if (p_flags & FFX_RESOURCE_USAGE_UAV) {
 		ret |= RD::TEXTURE_USAGE_STORAGE_BIT;
 		ret |= RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT;
 		ret |= RD::TEXTURE_USAGE_CAN_COPY_TO_BIT;
@@ -168,11 +168,11 @@ uint32_t ffx_usage_to_rd_usage_flags(uint32_t flags) {
 	return ret;
 }
 
-FfxErrorCode create_backend_context_rd(FfxFsr2Interface *backend_interface, FfxDevice device) {
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
+static FfxErrorCode create_backend_context_rd(FfxFsr2Interface *p_backend_interface, FfxDevice p_device) {
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
 
 	// Store pointer to the device common to all contexts.
-	scratch.device = device;
+	scratch.device = p_device;
 
 	// Create a ring buffer of uniform buffers.
 	// FIXME: This could be optimized to be a single memory block if it was possible for RD to create views into a particular memory range of a UBO.
@@ -184,16 +184,16 @@ FfxErrorCode create_backend_context_rd(FfxFsr2Interface *backend_interface, FfxD
 	return FFX_OK;
 }
 
-FfxErrorCode get_device_capabilities_rd(FfxFsr2Interface *backend_interface, FfxDeviceCapabilities *out_device_capabilities, FfxDevice device) {
-	FSR2Effect::Device &effect_device = *reinterpret_cast<FSR2Effect::Device *>(device);
+static FfxErrorCode get_device_capabilities_rd(FfxFsr2Interface *p_backend_interface, FfxDeviceCapabilities *p_out_device_capabilities, FfxDevice p_device) {
+	FSR2Effect::Device &effect_device = *reinterpret_cast<FSR2Effect::Device *>(p_device);
 
-	*out_device_capabilities = effect_device.capabilities;
+	*p_out_device_capabilities = effect_device.capabilities;
 
 	return FFX_OK;
 }
 
-FfxErrorCode destroy_backend_context_rd(FfxFsr2Interface *backend_interface) {
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
+static FfxErrorCode destroy_backend_context_rd(FfxFsr2Interface *p_backend_interface) {
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
 
 	for (uint32_t i = 0; i < FSR2_UBO_RING_BUFFER_SIZE; i++) {
 		RD::get_singleton()->free(scratch.ubo_ring_buffer[i]);
@@ -202,14 +202,14 @@ FfxErrorCode destroy_backend_context_rd(FfxFsr2Interface *backend_interface) {
 	return FFX_OK;
 }
 
-FfxErrorCode create_resource_rd(FfxFsr2Interface *backend_interface, const FfxCreateResourceDescription *create_resource_description, FfxResourceInternal *out_resource) {
+static FfxErrorCode create_resource_rd(FfxFsr2Interface *p_backend_interface, const FfxCreateResourceDescription *p_create_resource_description, FfxResourceInternal *p_out_resource) {
 	// FSR2's base implementation won't issue a call to create a heap type that isn't just default on its own,
 	// so we can safely ignore it as RD does not expose this concept.
-	ERR_FAIL_COND_V(create_resource_description->heapType != FFX_HEAP_TYPE_DEFAULT, FFX_ERROR_INVALID_ARGUMENT);
+	ERR_FAIL_COND_V(p_create_resource_description->heapType != FFX_HEAP_TYPE_DEFAULT, FFX_ERROR_INVALID_ARGUMENT);
 
 	RenderingDevice *rd = RD::get_singleton();
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
-	FfxResourceDescription res_desc = create_resource_description->resourceDescription;
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
+	FfxResourceDescription res_desc = p_create_resource_description->resourceDescription;
 
 	// FSR2's base implementation never requests buffer creation.
 	ERR_FAIL_COND_V(res_desc.type != FFX_RESOURCE_TYPE_TEXTURE1D && res_desc.type != FFX_RESOURCE_TYPE_TEXTURE2D && res_desc.type != FFX_RESOURCE_TYPE_TEXTURE3D, FFX_ERROR_INVALID_ARGUMENT);
@@ -220,17 +220,17 @@ FfxErrorCode create_resource_rd(FfxFsr2Interface *backend_interface, const FfxCr
 	}
 
 	Vector<PackedByteArray> initial_data;
-	if (create_resource_description->initDataSize) {
+	if (p_create_resource_description->initDataSize) {
 		PackedByteArray byte_array;
-		byte_array.resize(create_resource_description->initDataSize);
-		memcpy(byte_array.ptrw(), create_resource_description->initData, create_resource_description->initDataSize);
+		byte_array.resize(p_create_resource_description->initDataSize);
+		memcpy(byte_array.ptrw(), p_create_resource_description->initData, p_create_resource_description->initDataSize);
 		initial_data.push_back(byte_array);
 	}
 
 	RD::TextureFormat texture_format;
 	texture_format.texture_type = ffx_resource_type_to_rd_texture_type(res_desc.type);
 	texture_format.format = ffx_surface_format_to_rd_format(res_desc.format);
-	texture_format.usage_bits = ffx_usage_to_rd_usage_flags(create_resource_description->usage);
+	texture_format.usage_bits = ffx_usage_to_rd_usage_flags(p_create_resource_description->usage);
 	texture_format.width = res_desc.width;
 	texture_format.height = res_desc.height;
 	texture_format.depth = res_desc.depth;
@@ -239,33 +239,33 @@ FfxErrorCode create_resource_rd(FfxFsr2Interface *backend_interface, const FfxCr
 	RID texture = rd->texture_create(texture_format, RD::TextureView(), initial_data);
 	ERR_FAIL_COND_V(texture.is_null(), FFX_ERROR_BACKEND_API_ERROR);
 
-	rd->set_resource_name(texture, String(create_resource_description->name));
+	rd->set_resource_name(texture, String(p_create_resource_description->name));
 
 	// Add the resource to the storage and use the internal index to reference it.
-	out_resource->internalIndex = scratch.resources.add(texture, false, create_resource_description->id, res_desc);
+	p_out_resource->internalIndex = scratch.resources.add(texture, false, p_create_resource_description->id, res_desc);
 
 	return FFX_OK;
 }
 
-FfxErrorCode register_resource_rd(FfxFsr2Interface *backend_interface, const FfxResource *in_resource, FfxResourceInternal *out_resource) {
-	if (in_resource->resource == nullptr) {
+static FfxErrorCode register_resource_rd(FfxFsr2Interface *p_backend_interface, const FfxResource *p_in_resource, FfxResourceInternal *p_out_resource) {
+	if (p_in_resource->resource == nullptr) {
 		// Null resource case.
-		out_resource->internalIndex = -1;
+		p_out_resource->internalIndex = -1;
 		return FFX_OK;
 	}
 
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
-	const RID &rid = *reinterpret_cast<const RID *>(in_resource->resource);
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
+	const RID &rid = *reinterpret_cast<const RID *>(p_in_resource->resource);
 	ERR_FAIL_COND_V(rid.is_null(), FFX_ERROR_INVALID_ARGUMENT);
 
 	// Add the resource to the storage and use the internal index to reference it.
-	out_resource->internalIndex = scratch.resources.add(rid, true, FSR2Context::RESOURCE_ID_DYNAMIC, in_resource->description);
+	p_out_resource->internalIndex = scratch.resources.add(rid, true, FSR2Context::RESOURCE_ID_DYNAMIC, p_in_resource->description);
 
 	return FFX_OK;
 }
 
-FfxErrorCode unregister_resources_rd(FfxFsr2Interface *backend_interface) {
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
+static FfxErrorCode unregister_resources_rd(FfxFsr2Interface *p_backend_interface) {
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
 	LocalVector<uint32_t> dynamic_list_copy = scratch.resources.dynamic_list;
 	for (uint32_t i : dynamic_list_copy) {
 		scratch.resources.remove(i);
@@ -274,31 +274,31 @@ FfxErrorCode unregister_resources_rd(FfxFsr2Interface *backend_interface) {
 	return FFX_OK;
 }
 
-FfxResourceDescription get_resource_description_rd(FfxFsr2Interface *backend_interface, FfxResourceInternal resource) {
-	if (resource.internalIndex != -1) {
-		FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
-		return scratch.resources.descriptions[resource.internalIndex];
+static FfxResourceDescription get_resource_description_rd(FfxFsr2Interface *p_backend_interface, FfxResourceInternal p_resource) {
+	if (p_resource.internalIndex != -1) {
+		FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
+		return scratch.resources.descriptions[p_resource.internalIndex];
 	} else {
 		return {};
 	}
 }
 
-FfxErrorCode destroy_resource_rd(FfxFsr2Interface *backend_interface, FfxResourceInternal resource) {
-	if (resource.internalIndex != -1) {
-		FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
-		if (scratch.resources.rids[resource.internalIndex].is_valid()) {
-			RD::get_singleton()->free(scratch.resources.rids[resource.internalIndex]);
-			scratch.resources.remove(resource.internalIndex);
+static FfxErrorCode destroy_resource_rd(FfxFsr2Interface *p_backend_interface, FfxResourceInternal p_resource) {
+	if (p_resource.internalIndex != -1) {
+		FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
+		if (scratch.resources.rids[p_resource.internalIndex].is_valid()) {
+			RD::get_singleton()->free(scratch.resources.rids[p_resource.internalIndex]);
+			scratch.resources.remove(p_resource.internalIndex);
 		}
 	}
 
 	return FFX_OK;
 }
 
-FfxErrorCode create_pipeline_rd(FfxFsr2Interface *backend_interface, FfxFsr2Pass pass, const FfxPipelineDescription *pipeline_description, FfxPipelineState *out_pipeline) {
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
+static FfxErrorCode create_pipeline_rd(FfxFsr2Interface *p_backend_interface, FfxFsr2Pass p_pass, const FfxPipelineDescription *p_pipeline_description, FfxPipelineState *p_out_pipeline) {
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
 	FSR2Effect::Device &device = *reinterpret_cast<FSR2Effect::Device *>(scratch.device);
-	FSR2Effect::Pass &effect_pass = device.passes[pass];
+	FSR2Effect::Pass &effect_pass = device.passes[p_pass];
 
 	if (effect_pass.pipeline.pipeline_rid.is_null()) {
 		// Create pipeline for the device if it hasn't been created yet.
@@ -311,27 +311,27 @@ FfxErrorCode create_pipeline_rd(FfxFsr2Interface *backend_interface, FfxFsr2Pass
 
 	// While this is not their intended use, we use the pipeline and root signature pointers to store the
 	// RIDs to the pipeline and shader that RD needs for the compute pipeline.
-	out_pipeline->pipeline = reinterpret_cast<FfxPipeline>(&effect_pass.pipeline);
-	out_pipeline->rootSignature = reinterpret_cast<FfxRootSignature>(&effect_pass.root_signature);
+	p_out_pipeline->pipeline = reinterpret_cast<FfxPipeline>(&effect_pass.pipeline);
+	p_out_pipeline->rootSignature = reinterpret_cast<FfxRootSignature>(&effect_pass.root_signature);
 
-	out_pipeline->srvCount = effect_pass.sampled_bindings.size();
-	ERR_FAIL_COND_V(out_pipeline->srvCount > FFX_MAX_NUM_SRVS, FFX_ERROR_OUT_OF_RANGE);
-	memcpy(out_pipeline->srvResourceBindings, effect_pass.sampled_bindings.ptr(), sizeof(FfxResourceBinding) * out_pipeline->srvCount);
+	p_out_pipeline->srvCount = effect_pass.sampled_bindings.size();
+	ERR_FAIL_COND_V(p_out_pipeline->srvCount > FFX_MAX_NUM_SRVS, FFX_ERROR_OUT_OF_RANGE);
+	memcpy(p_out_pipeline->srvResourceBindings, effect_pass.sampled_bindings.ptr(), sizeof(FfxResourceBinding) * p_out_pipeline->srvCount);
 
-	out_pipeline->uavCount = effect_pass.storage_bindings.size();
-	ERR_FAIL_COND_V(out_pipeline->uavCount > FFX_MAX_NUM_UAVS, FFX_ERROR_OUT_OF_RANGE);
-	memcpy(out_pipeline->uavResourceBindings, effect_pass.storage_bindings.ptr(), sizeof(FfxResourceBinding) * out_pipeline->uavCount);
+	p_out_pipeline->uavCount = effect_pass.storage_bindings.size();
+	ERR_FAIL_COND_V(p_out_pipeline->uavCount > FFX_MAX_NUM_UAVS, FFX_ERROR_OUT_OF_RANGE);
+	memcpy(p_out_pipeline->uavResourceBindings, effect_pass.storage_bindings.ptr(), sizeof(FfxResourceBinding) * p_out_pipeline->uavCount);
 
-	out_pipeline->constCount = effect_pass.uniform_bindings.size();
-	ERR_FAIL_COND_V(out_pipeline->constCount > FFX_MAX_NUM_CONST_BUFFERS, FFX_ERROR_OUT_OF_RANGE);
-	memcpy(out_pipeline->cbResourceBindings, effect_pass.uniform_bindings.ptr(), sizeof(FfxResourceBinding) * out_pipeline->constCount);
+	p_out_pipeline->constCount = effect_pass.uniform_bindings.size();
+	ERR_FAIL_COND_V(p_out_pipeline->constCount > FFX_MAX_NUM_CONST_BUFFERS, FFX_ERROR_OUT_OF_RANGE);
+	memcpy(p_out_pipeline->cbResourceBindings, effect_pass.uniform_bindings.ptr(), sizeof(FfxResourceBinding) * p_out_pipeline->constCount);
 
-	bool low_resolution_mvs = (pipeline_description->contextFlags & FFX_FSR2_ENABLE_DISPLAY_RESOLUTION_MOTION_VECTORS) == 0;
+	bool low_resolution_mvs = (p_pipeline_description->contextFlags & FFX_FSR2_ENABLE_DISPLAY_RESOLUTION_MOTION_VECTORS) == 0;
 
-	if (pass == FFX_FSR2_PASS_ACCUMULATE || pass == FFX_FSR2_PASS_ACCUMULATE_SHARPEN) {
+	if (p_pass == FFX_FSR2_PASS_ACCUMULATE || p_pass == FFX_FSR2_PASS_ACCUMULATE_SHARPEN) {
 		// Change the binding for motion vectors in this particular pass if low resolution MVs are used.
 		if (low_resolution_mvs) {
-			FfxResourceBinding &binding = out_pipeline->srvResourceBindings[2];
+			FfxResourceBinding &binding = p_out_pipeline->srvResourceBindings[2];
 			wcscpy_s(binding.name, L"r_dilated_motion_vectors");
 		}
 	}
@@ -339,39 +339,39 @@ FfxErrorCode create_pipeline_rd(FfxFsr2Interface *backend_interface, FfxFsr2Pass
 	return FFX_OK;
 }
 
-FfxErrorCode destroy_pipeline_rd(FfxFsr2Interface *backend_interface, FfxPipelineState *pipeline) {
+static FfxErrorCode destroy_pipeline_rd(FfxFsr2Interface *p_backend_interface, FfxPipelineState *p_pipeline) {
 	// We don't want to destroy pipelines when the FSR2 API deems it necessary as it'll do so whenever the context is destroyed.
 
 	return FFX_OK;
 }
 
-FfxErrorCode schedule_gpu_job_rd(FfxFsr2Interface *backend_interface, const FfxGpuJobDescription *job) {
-	ERR_FAIL_COND_V(!backend_interface, FFX_ERROR_INVALID_ARGUMENT);
-	ERR_FAIL_COND_V(!job, FFX_ERROR_INVALID_ARGUMENT);
+static FfxErrorCode schedule_gpu_job_rd(FfxFsr2Interface *p_backend_interface, const FfxGpuJobDescription *p_job) {
+	ERR_FAIL_NULL_V(p_backend_interface, FFX_ERROR_INVALID_ARGUMENT);
+	ERR_FAIL_NULL_V(p_job, FFX_ERROR_INVALID_ARGUMENT);
 
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
-	scratch.gpu_jobs.push_back(*job);
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
+	scratch.gpu_jobs.push_back(*p_job);
 
 	return FFX_OK;
 }
 
-FfxErrorCode execute_gpu_job_clear_float_rd(FSR2Context::Scratch &scratch, const FfxClearFloatJobDescription &job) {
-	RID resource = scratch.resources.rids[job.target.internalIndex];
-	FfxResourceDescription &desc = scratch.resources.descriptions[job.target.internalIndex];
+static FfxErrorCode execute_gpu_job_clear_float_rd(FSR2Context::Scratch &p_scratch, const FfxClearFloatJobDescription &p_job) {
+	RID resource = p_scratch.resources.rids[p_job.target.internalIndex];
+	FfxResourceDescription &desc = p_scratch.resources.descriptions[p_job.target.internalIndex];
 
 	ERR_FAIL_COND_V(desc.type == FFX_RESOURCE_TYPE_BUFFER, FFX_ERROR_INVALID_ARGUMENT);
 
-	Color color(job.color[0], job.color[1], job.color[2], job.color[3]);
+	Color color(p_job.color[0], p_job.color[1], p_job.color[2], p_job.color[3]);
 	RD::get_singleton()->texture_clear(resource, color, 0, desc.mipCount, 0, 1);
 
 	return FFX_OK;
 }
 
-FfxErrorCode execute_gpu_job_copy_rd(FSR2Context::Scratch &scratch, const FfxCopyJobDescription &job) {
-	RID src = scratch.resources.rids[job.src.internalIndex];
-	RID dst = scratch.resources.rids[job.dst.internalIndex];
-	FfxResourceDescription &src_desc = scratch.resources.descriptions[job.src.internalIndex];
-	FfxResourceDescription &dst_desc = scratch.resources.descriptions[job.dst.internalIndex];
+static FfxErrorCode execute_gpu_job_copy_rd(FSR2Context::Scratch &p_scratch, const FfxCopyJobDescription &p_job) {
+	RID src = p_scratch.resources.rids[p_job.src.internalIndex];
+	RID dst = p_scratch.resources.rids[p_job.dst.internalIndex];
+	FfxResourceDescription &src_desc = p_scratch.resources.descriptions[p_job.src.internalIndex];
+	FfxResourceDescription &dst_desc = p_scratch.resources.descriptions[p_job.dst.internalIndex];
 
 	ERR_FAIL_COND_V(src_desc.type == FFX_RESOURCE_TYPE_BUFFER, FFX_ERROR_INVALID_ARGUMENT);
 	ERR_FAIL_COND_V(dst_desc.type == FFX_RESOURCE_TYPE_BUFFER, FFX_ERROR_INVALID_ARGUMENT);
@@ -386,44 +386,44 @@ FfxErrorCode execute_gpu_job_copy_rd(FSR2Context::Scratch &scratch, const FfxCop
 	return FFX_OK;
 }
 
-FfxErrorCode execute_gpu_job_compute_rd(FSR2Context::Scratch &scratch, const FfxComputeJobDescription &job) {
+static FfxErrorCode execute_gpu_job_compute_rd(FSR2Context::Scratch &p_scratch, const FfxComputeJobDescription &p_job) {
 	UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
 	ERR_FAIL_NULL_V(uniform_set_cache, FFX_ERROR_BACKEND_API_ERROR);
 
-	FSR2Effect::RootSignature &root_signature = *reinterpret_cast<FSR2Effect::RootSignature *>(job.pipeline.rootSignature);
+	FSR2Effect::RootSignature &root_signature = *reinterpret_cast<FSR2Effect::RootSignature *>(p_job.pipeline.rootSignature);
 	ERR_FAIL_COND_V(root_signature.shader_rid.is_null(), FFX_ERROR_INVALID_ARGUMENT);
 
-	FSR2Effect::Pipeline &backend_pipeline = *reinterpret_cast<FSR2Effect::Pipeline *>(job.pipeline.pipeline);
+	FSR2Effect::Pipeline &backend_pipeline = *reinterpret_cast<FSR2Effect::Pipeline *>(p_job.pipeline.pipeline);
 	ERR_FAIL_COND_V(backend_pipeline.pipeline_rid.is_null(), FFX_ERROR_INVALID_ARGUMENT);
 
 	Vector<RD::Uniform> compute_uniforms;
-	for (uint32_t i = 0; i < job.pipeline.srvCount; i++) {
-		RID texture_rid = scratch.resources.rids[job.srvs[i].internalIndex];
-		RD::Uniform texture_uniform(RD::UNIFORM_TYPE_TEXTURE, job.pipeline.srvResourceBindings[i].slotIndex, texture_rid);
+	for (uint32_t i = 0; i < p_job.pipeline.srvCount; i++) {
+		RID texture_rid = p_scratch.resources.rids[p_job.srvs[i].internalIndex];
+		RD::Uniform texture_uniform(RD::UNIFORM_TYPE_TEXTURE, p_job.pipeline.srvResourceBindings[i].slotIndex, texture_rid);
 		compute_uniforms.push_back(texture_uniform);
 	}
 
-	for (uint32_t i = 0; i < job.pipeline.uavCount; i++) {
-		RID image_rid = scratch.resources.rids[job.uavs[i].internalIndex];
+	for (uint32_t i = 0; i < p_job.pipeline.uavCount; i++) {
+		RID image_rid = p_scratch.resources.rids[p_job.uavs[i].internalIndex];
 		RD::Uniform storage_uniform;
 		storage_uniform.uniform_type = RD::UNIFORM_TYPE_IMAGE;
-		storage_uniform.binding = job.pipeline.uavResourceBindings[i].slotIndex;
+		storage_uniform.binding = p_job.pipeline.uavResourceBindings[i].slotIndex;
 
-		if (job.uavMip[i] > 0) {
-			LocalVector<RID> &mip_slice_rids = scratch.resources.mip_slice_rids[job.uavs[i].internalIndex];
+		if (p_job.uavMip[i] > 0) {
+			LocalVector<RID> &mip_slice_rids = p_scratch.resources.mip_slice_rids[p_job.uavs[i].internalIndex];
 			if (mip_slice_rids.is_empty()) {
-				mip_slice_rids.resize(scratch.resources.descriptions[job.uavs[i].internalIndex].mipCount);
+				mip_slice_rids.resize(p_scratch.resources.descriptions[p_job.uavs[i].internalIndex].mipCount);
 			}
 
-			ERR_FAIL_COND_V(job.uavMip[i] >= mip_slice_rids.size(), FFX_ERROR_INVALID_ARGUMENT);
+			ERR_FAIL_COND_V(p_job.uavMip[i] >= mip_slice_rids.size(), FFX_ERROR_INVALID_ARGUMENT);
 
-			if (mip_slice_rids[job.uavMip[i]].is_null()) {
-				mip_slice_rids[job.uavMip[i]] = RD::get_singleton()->texture_create_shared_from_slice(RD::TextureView(), image_rid, 0, job.uavMip[i]);
+			if (mip_slice_rids[p_job.uavMip[i]].is_null()) {
+				mip_slice_rids[p_job.uavMip[i]] = RD::get_singleton()->texture_create_shared_from_slice(RD::TextureView(), image_rid, 0, p_job.uavMip[i]);
 			}
 
-			ERR_FAIL_COND_V(mip_slice_rids[job.uavMip[i]].is_null(), FFX_ERROR_BACKEND_API_ERROR);
+			ERR_FAIL_COND_V(mip_slice_rids[p_job.uavMip[i]].is_null(), FFX_ERROR_BACKEND_API_ERROR);
 
-			storage_uniform.append_id(mip_slice_rids[job.uavMip[i]]);
+			storage_uniform.append_id(mip_slice_rids[p_job.uavMip[i]]);
 		} else {
 			storage_uniform.append_id(image_rid);
 		}
@@ -431,18 +431,18 @@ FfxErrorCode execute_gpu_job_compute_rd(FSR2Context::Scratch &scratch, const Ffx
 		compute_uniforms.push_back(storage_uniform);
 	}
 
-	for (uint32_t i = 0; i < job.pipeline.constCount; i++) {
-		RID buffer_rid = scratch.ubo_ring_buffer[scratch.ubo_ring_buffer_index];
-		scratch.ubo_ring_buffer_index = (scratch.ubo_ring_buffer_index + 1) % FSR2_UBO_RING_BUFFER_SIZE;
+	for (uint32_t i = 0; i < p_job.pipeline.constCount; i++) {
+		RID buffer_rid = p_scratch.ubo_ring_buffer[p_scratch.ubo_ring_buffer_index];
+		p_scratch.ubo_ring_buffer_index = (p_scratch.ubo_ring_buffer_index + 1) % FSR2_UBO_RING_BUFFER_SIZE;
 
-		BitField<RD::BarrierMask> post_barrier = (i == (job.pipeline.constCount - 1)) ? RD::BARRIER_MASK_ALL_BARRIERS : RD::BARRIER_MASK_NO_BARRIER;
-		RD::get_singleton()->buffer_update(buffer_rid, 0, job.cbs[i].uint32Size * sizeof(uint32_t), job.cbs[i].data, post_barrier);
+		BitField<RD::BarrierMask> post_barrier = (i == (p_job.pipeline.constCount - 1)) ? RD::BARRIER_MASK_ALL_BARRIERS : RD::BARRIER_MASK_NO_BARRIER;
+		RD::get_singleton()->buffer_update(buffer_rid, 0, p_job.cbs[i].uint32Size * sizeof(uint32_t), p_job.cbs[i].data, post_barrier);
 
-		RD::Uniform buffer_uniform(RD::UNIFORM_TYPE_UNIFORM_BUFFER, job.pipeline.cbResourceBindings[i].slotIndex, buffer_rid);
+		RD::Uniform buffer_uniform(RD::UNIFORM_TYPE_UNIFORM_BUFFER, p_job.pipeline.cbResourceBindings[i].slotIndex, buffer_rid);
 		compute_uniforms.push_back(buffer_uniform);
 	}
 
-	FSR2Effect::Device &device = *reinterpret_cast<FSR2Effect::Device *>(scratch.device);
+	FSR2Effect::Device &device = *reinterpret_cast<FSR2Effect::Device *>(p_scratch.device);
 	RD::Uniform u_point_clamp_sampler(RD::UniformType::UNIFORM_TYPE_SAMPLER, 0, device.point_clamp_sampler);
 	RD::Uniform u_linear_clamp_sampler(RD::UniformType::UNIFORM_TYPE_SAMPLER, 1, device.linear_clamp_sampler);
 
@@ -450,16 +450,16 @@ FfxErrorCode execute_gpu_job_compute_rd(FSR2Context::Scratch &scratch, const Ffx
 	RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, backend_pipeline.pipeline_rid);
 	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(root_signature.shader_rid, 0, u_point_clamp_sampler, u_linear_clamp_sampler), 0);
 	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache_vec(root_signature.shader_rid, 1, compute_uniforms), 1);
-	RD::get_singleton()->compute_list_dispatch(compute_list, job.dimensions[0], job.dimensions[1], job.dimensions[2]);
+	RD::get_singleton()->compute_list_dispatch(compute_list, p_job.dimensions[0], p_job.dimensions[1], p_job.dimensions[2]);
 	RD::get_singleton()->compute_list_end();
 
 	return FFX_OK;
 }
 
-FfxErrorCode execute_gpu_jobs_rd(FfxFsr2Interface *backend_interface, FfxCommandList command_list) {
-	ERR_FAIL_COND_V(!backend_interface, FFX_ERROR_INVALID_ARGUMENT);
+static FfxErrorCode execute_gpu_jobs_rd(FfxFsr2Interface *p_backend_interface, FfxCommandList p_command_list) {
+	ERR_FAIL_NULL_V(p_backend_interface, FFX_ERROR_INVALID_ARGUMENT);
 
-	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(backend_interface->scratchBuffer);
+	FSR2Context::Scratch &scratch = *reinterpret_cast<FSR2Context::Scratch *>(p_backend_interface->scratchBuffer);
 	FfxErrorCode error_code = FFX_OK;
 	for (const FfxGpuJobDescription &job : scratch.gpu_jobs) {
 		switch (job.jobType) {
@@ -488,15 +488,15 @@ FfxErrorCode execute_gpu_jobs_rd(FfxFsr2Interface *backend_interface, FfxCommand
 	return FFX_OK;
 }
 
-FfxResource get_resource_rd(RID *rid, const wchar_t *name) {
+static FfxResource get_resource_rd(RID *p_rid, const wchar_t *p_name) {
 	FfxResource res = {};
-	if (rid->is_null()) {
+	if (p_rid->is_null()) {
 		return res;
 	}
 
-	wcscpy_s(res.name, name);
+	wcscpy_s(res.name, p_name);
 
-	RD::TextureFormat texture_format = RD::get_singleton()->texture_get_format(*rid);
+	RD::TextureFormat texture_format = RD::get_singleton()->texture_get_format(*p_rid);
 	res.description.type = rd_texture_type_to_ffx_resource_type(texture_format.texture_type);
 	res.description.format = rd_format_to_ffx_surface_format(texture_format.format);
 	res.description.width = texture_format.width;
@@ -504,7 +504,7 @@ FfxResource get_resource_rd(RID *rid, const wchar_t *name) {
 	res.description.depth = texture_format.depth;
 	res.description.mipCount = texture_format.mipmaps;
 	res.description.flags = FFX_RESOURCE_FLAGS_NONE;
-	res.resource = reinterpret_cast<void *>(rid);
+	res.resource = reinterpret_cast<void *>(p_rid);
 	res.isDepth = texture_format.usage_bits & RD::TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
 	return res;
@@ -804,7 +804,9 @@ FSR2Effect::~FSR2Effect() {
 	RD::get_singleton()->free(device.linear_clamp_sampler);
 
 	for (uint32_t i = 0; i < FFX_FSR2_PASS_COUNT; i++) {
-		RD::get_singleton()->free(device.passes[i].pipeline.pipeline_rid);
+		if (device.passes[i].pipeline.pipeline_rid.is_valid()) {
+			RD::get_singleton()->free(device.passes[i].pipeline.pipeline_rid);
+		}
 		device.passes[i].shader->version_free(device.passes[i].shader_version);
 	}
 }

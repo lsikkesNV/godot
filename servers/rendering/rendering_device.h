@@ -550,7 +550,7 @@ public:
 
 	virtual RID texture_create(const TextureFormat &p_format, const TextureView &p_view, const Vector<Vector<uint8_t>> &p_data = Vector<Vector<uint8_t>>()) = 0;
 	virtual RID texture_create_shared(const TextureView &p_view, RID p_with_texture) = 0;
-	virtual RID texture_create_from_extension(TextureType p_type, DataFormat p_format, TextureSamples p_samples, uint64_t p_flags, uint64_t p_image, uint64_t p_width, uint64_t p_height, uint64_t p_depth, uint64_t p_layers) = 0;
+	virtual RID texture_create_from_extension(TextureType p_type, DataFormat p_format, TextureSamples p_samples, BitField<RenderingDevice::TextureUsageBits> p_flags, uint64_t p_image, uint64_t p_width, uint64_t p_height, uint64_t p_depth, uint64_t p_layers) = 0;
 
 	enum TextureSliceType {
 		TEXTURE_SLICE_2D,
@@ -1428,6 +1428,13 @@ protected:
 	};
 
 	Error _reflect_spirv(const Vector<ShaderStageSPIRVData> &p_spirv, SpirvReflectionData &r_reflection_data);
+
+#ifndef DISABLE_DEPRECATED
+	BitField<BarrierMask> _convert_barrier_mask_81356(BitField<BarrierMask> p_old_barrier);
+	void _draw_list_end_bind_compat_81356(BitField<BarrierMask> p_post_barrier);
+	void _compute_list_end_bind_compat_81356(BitField<BarrierMask> p_post_barrier);
+	void _barrier_bind_compat_81356(BitField<BarrierMask> p_from, BitField<BarrierMask> p_to);
+#endif
 };
 
 VARIANT_ENUM_CAST(RenderingDevice::DeviceType)

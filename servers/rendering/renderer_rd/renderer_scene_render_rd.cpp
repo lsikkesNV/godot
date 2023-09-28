@@ -360,14 +360,14 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 		RendererRD::BokehDOF::BokehBuffers buffers;
 
 		// Textures we use
-		buffers.base_texture_size = rb->get_internal_size();
+		buffers.base_texture_size = color_size;
 		buffers.secondary_texture = rb->get_texture_slice(RB_SCOPE_BUFFERS, RB_TEX_BLUR_0, 0, 0);
 		buffers.half_texture[0] = rb->get_texture_slice(RB_SCOPE_BUFFERS, RB_TEX_BLUR_1, 0, 0);
 		buffers.half_texture[1] = rb->get_texture_slice(RB_SCOPE_BUFFERS, RB_TEX_BLUR_0, 0, 1);
 
 		if (can_use_storage) {
 			for (uint32_t i = 0; i < rb->get_view_count(); i++) {
-				buffers.base_texture = rb->get_internal_texture(i);
+				buffers.base_texture = use_upscaled_texture ? rb->get_upscaled_texture(i) : rb->get_internal_texture(i);
 				buffers.depth_texture = rb->get_depth_texture(i);
 
 				// In stereo p_render_data->z_near and p_render_data->z_far can be offset for our combined frustum.
@@ -389,7 +389,7 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 			buffers.base_weight_fb = rb->weight_buffers[0].fb;
 
 			for (uint32_t i = 0; i < rb->get_view_count(); i++) {
-				buffers.base_texture = rb->get_internal_texture(i);
+				buffers.base_texture = use_upscaled_texture ? rb->get_upscaled_texture(i) : rb->get_internal_texture(i);
 				buffers.depth_texture = rb->get_depth_texture(i);
 				buffers.base_fb = FramebufferCacheRD::get_singleton()->get_cache(buffers.base_texture); // TODO move this into bokeh_dof_raster, we can do this internally
 
