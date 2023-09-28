@@ -9368,6 +9368,12 @@ uint64_t RenderingDeviceVulkan::get_driver_resource(DriverResource p_resource, R
 		case DRIVER_RESOURCE_VULKAN_PHYSICAL_DEVICE: {
 			return (uint64_t)context->get_physical_device();
 		} break;
+		case DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_DRAW: {
+			return (uint64_t)frames[frame].draw_command_buffer;
+		} break;
+		case DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_SETUP: {
+			return (uint64_t)frames[frame].setup_command_buffer;
+		} break;
 		case DRIVER_RESOURCE_VULKAN_INSTANCE: {
 			return (uint64_t)context->get_instance();
 		} break;
@@ -9383,11 +9389,29 @@ uint64_t RenderingDeviceVulkan::get_driver_resource(DriverResource p_resource, R
 
 			return (uint64_t)tex->image;
 		} break;
+		case DRIVER_RESOURCE_VULKAN_IMAGE_DEVICE_MEMORY: {
+			Texture *tex = texture_owner.get_or_null(p_rid);
+			ERR_FAIL_NULL_V(tex, 0);
+
+			return (uint64_t)tex->allocation_info.deviceMemory;
+		} break;
+		case DRIVER_RESOURCE_VULKAN_IMAGE_LAYOUT: {
+			Texture *tex = texture_owner.get_or_null(p_rid);
+			ERR_FAIL_NULL_V(tex, 0);
+
+			return (uint64_t)tex->layout;
+		} break;
 		case DRIVER_RESOURCE_VULKAN_IMAGE_VIEW: {
 			Texture *tex = texture_owner.get_or_null(p_rid);
 			ERR_FAIL_NULL_V(tex, 0);
 
 			return (uint64_t)tex->view;
+		} break;
+		case DRIVER_RESOURCE_VULKAN_IMAGE_USAGE_FLAGS: {
+			Texture *tex = texture_owner.get_or_null(p_rid);
+			ERR_FAIL_NULL_V(tex, 0);
+
+			return (uint64_t)tex->usage_flags;
 		} break;
 		case DRIVER_RESOURCE_VULKAN_IMAGE_NATIVE_TEXTURE_FORMAT: {
 			Texture *tex = texture_owner.get_or_null(p_rid);
