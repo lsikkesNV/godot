@@ -96,9 +96,21 @@ DLSSContextInner::DLSSContextInner() {
 }
 
 DLSSEffect::DLSSEffect() {
+	// Initialize motion vector decode shader
+	{
+		Vector<String> modes;
+		modes.push_back("\n");
+		shaders.mvec_decode_shader.initialize(modes, "");
+		shaders.mvec_decode_version = shaders.mvec_decode_shader.version_create();
+		shaders.mvec_decode_pipeline = RD::get_singleton()->compute_pipeline_create(shaders.mvec_decode_shader.version_get_shader(shaders.mvec_decode_version, 0));
+	}
 }
 
 DLSSEffect::~DLSSEffect() {
+	// Deinitialize motion vector decode
+	{
+		shaders.mvec_decode_shader.version_free(shaders.mvec_decode_version);
+	}
 }
 
 DLSSContext *DLSSEffect::create_context(Size2i p_internal_size, Size2i p_target_size) {
@@ -159,6 +171,44 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 	context->currentDlssOptions.colorBuffersHDR = sl::Boolean::eTrue;
 
 	StreamlineContext::get().slDLSSSetOptions(context->viewport, context->currentDlssOptions);
+
+	// Decode mvecs
+	{
+		UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
+		ERR_FAIL_NULL(uniform_set_cache);
+		MaterialStorage *material_storage = MaterialStorage::get_singleton();
+		ERR_FAIL_NULL(material_storage);
+
+		// setup our uniforms
+		RID default_sampler = material_storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+
+		RD::Uniform u_velocity_image(RD::UNIFORM_TYPE_IMAGE, 0, p_params.velocity);
+		RD::Uniform u_depth_texture(RD::UNIFORM_TYPE_TEXTURE, 0, p_params.depth);
+
+		RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
+
+		RID shader = shaders.mvec_decode_shader.version_get_shader(shaders.mvec_decode_version, 0);
+		ERR_FAIL_COND(shader.is_null());
+
+		RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, shaders.mvec_decode_pipeline);
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 0, u_velocity_image), 0);
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, uniform_set_cache->get_cache(shader, 1, u_depth_texture), 1);
+
+		auto texture_format = RD::get_singleton()->texture_get_format(p_params.velocity);
+
+		float push_constants[20];
+		push_constants[0] = texture_format.width;
+		push_constants[1] = texture_format.height;
+		push_constants[2] = 0.0f;
+		push_constants[3] = 0.0f;
+		memcpy(push_constants+4, &p_params.reprojection.columns[0].x, sizeof(float)*16);
+		RD::get_singleton()->compute_list_set_push_constant(compute_list, push_constants, sizeof(push_constants));
+
+		RD::get_singleton()->compute_list_dispatch_threads(compute_list, texture_format.width, texture_format.height, 1);
+		RD::get_singleton()->compute_list_add_barrier(compute_list);
+
+		RD::get_singleton()->compute_list_end();
+	}
 
 	// Set SL Options
 	{

@@ -33,6 +33,8 @@
 
 #include "servers/rendering/renderer_rd/shader_rd.h"
 
+#include "servers/rendering/renderer_rd/shaders/effects/motion_vector_decode.glsl.gen.h"
+
 namespace RendererRD {
 
 class DLSSContext {
@@ -45,6 +47,12 @@ public:
 	struct Device {
 
 	};
+
+	struct Shaders {
+		MotionVectorDecodeShaderRD mvec_decode_shader;
+		RID mvec_decode_version;
+		RID mvec_decode_pipeline;
+	} shaders;
 
 	struct Parameters {
 		DLSSContext *context;
