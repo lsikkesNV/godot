@@ -162,8 +162,8 @@ void RendererViewport::_configure_3d_render_buffers(Viewport *p_viewport) {
 				case RS::VIEWPORT_SCALING_3D_MODE_DLSS:
 					width = p_viewport->size.width;
 					height = p_viewport->size.height;
-					render_width = MAX(width * scaling_3d_scale, 1.0); // width / (width * scaling)
-					render_height = MAX(height * scaling_3d_scale, 1.0);
+					render_width = MAX(ceilf((float)width * scaling_3d_scale), 1.0); // width / (width * scaling)
+					render_height = MAX(ceilf((float)height * scaling_3d_scale), 1.0);
 					break;
 				case RS::VIEWPORT_SCALING_3D_MODE_OFF:
 					width = p_viewport->size.width;

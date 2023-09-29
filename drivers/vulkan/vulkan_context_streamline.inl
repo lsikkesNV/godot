@@ -48,6 +48,7 @@ public:
 	static StreamlineContext &get();
 
 	sl::FrameToken* last_token = nullptr;
+	bool isGame = false;
 
 #ifdef STREAMLINE_IMPLEMENTATION
 	VulkanContext::StreamlineCapabilities enumerate_support(VkPhysicalDevice device);
@@ -107,7 +108,7 @@ VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhy
 }
 
 void StreamlineContext::reflex_set_options(const sl::ReflexOptions& opts) {
-	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
+	if (isGame == false) // Disable reflex for editor or project settings.
 		return;
 
 	reflex_options = opts;
@@ -117,11 +118,17 @@ void StreamlineContext::reflex_set_options(const sl::ReflexOptions& opts) {
 }
 
 void StreamlineContext::reflex_marker(sl::FrameToken* frameToken, sl::ReflexMarker marker) {
+	if (isGame == false) // Disable reflex for editor or project settings.
+		return;
+
 	sl::Result result = this->slReflexSetMarker ? this->slReflexSetMarker(marker, *frameToken) : sl::Result::eOk;
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 }
 
 void StreamlineContext::reflex_sleep(sl::FrameToken* frameToken) {
+	if (isGame == false) // Disable reflex for editor or project settings.
+		return;
+
 	if(frameToken == nullptr)
 		return;
 	sl::Result result = this->slReflexSleep ? this->slReflexSleep(*frameToken) : sl::Result::eOk;
@@ -129,6 +136,9 @@ void StreamlineContext::reflex_sleep(sl::FrameToken* frameToken) {
 }
 
 void StreamlineContext::reflex_get_state(sl::ReflexState& reflexState) {
+	if (isGame == false) // Disable reflex for editor or project settings.
+		return;
+
 	sl::Result result = this->slReflexGetState ? this->slReflexGetState(reflexState) : sl::Result::eOk;
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 }
@@ -195,8 +205,9 @@ const char* StreamlineContext::result_to_string(sl::Result result) {
 
 void VulkanContext::streamline_initialize() {
 #if USE_STREAMLINE
+	StreamlineContext::get().isGame = true;
 	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
-		return;
+		StreamlineContext::get().isGame = false;
 
 	if(StreamlineContext::get().slInit != nullptr)
 		return; // already initialized.
@@ -208,19 +219,28 @@ void VulkanContext::streamline_initialize() {
 	}
 
 	sl::Preferences pref;
-    sl::Feature featuresToLoad[] = {
-        sl::kFeatureDLSS,
-        sl::kFeatureDLSS_G,
-        sl::kFeatureReflex
-    };
-	pref.featuresToLoad = featuresToLoad;
-	pref.numFeaturesToLoad = sizeof(featuresToLoad) / sizeof(featuresToLoad[0]);
+
+    Vector<sl::Feature> featuresToLoad;
+	featuresToLoad.push_back(sl::kFeatureDLSS);
+	if(StreamlineContext::get().isGame)
+	{
+		featuresToLoad.push_back(sl::kFeatureDLSS_G);
+		featuresToLoad.push_back(sl::kFeatureReflex);
+	}
+	pref.featuresToLoad = featuresToLoad.ptr();
+	pref.numFeaturesToLoad = featuresToLoad.size();
 	pref.renderAPI = sl::RenderAPI::eVulkan;
-	pref.showConsole = true;
+	
 	if(bool(GLOBAL_GET("rendering/nvidia/streamline_log")) == true)
+	{
 		pref.logLevel = sl::LogLevel::eVerbose;
+		pref.showConsole = true;
+	}
 	else
+	{
 		pref.logLevel = sl::LogLevel::eOff;
+		pref.showConsole = false;
+	}
 	sl::Result result = StreamlineContext::get().slInit(pref, sl::kSDKVersion);
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 
@@ -299,10 +319,14 @@ void VulkanContext::set_nvidia_parameter(RenderingDevice::NvidiaParameter parame
 
 void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 #if USE_STREAMLINE
-	if (Engine::get_singleton()->is_editor_hint() == true || Engine::get_singleton()->is_project_manager_hint() == true)
+	if (StreamlineContext::get().isGame == false || streamline_capabilities.reflexAvailable == false)
+	{
+		// Make sure we still get frame tokens, needed for DLSS.
+		if(marker == RenderingDevice::BeforeMessageLoop)
+			streamline_framemarker = StreamlineContext::get().get_frame_token();
+
 		return;
-	if(streamline_capabilities.reflexAvailable == false)
-		return;
+	}
 
 	static unsigned long long lastPingFrameDetected = 0; // TODO: Do this differently. Multi window?
 	sl::ReflexMarker sl_marker;
@@ -315,7 +339,6 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 			if (StreamlineContext::get().reflex_options.mode != sl::ReflexMode::eOff || StreamlineContext::get().reflex_options.frameLimitUs > 0)
 				StreamlineContext::get().reflex_sleep((sl::FrameToken *)streamline_framemarker);
 			sl_marker = sl::ReflexMarker::eInputSample;
-
 			break;
 		case RenderingDevice::BeginRender:
 			sl_marker = sl::ReflexMarker::eRenderSubmitStart; break;

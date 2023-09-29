@@ -62,7 +62,11 @@ public:
 			return sl::DLSSMode::eOff;
 
 		sl::DLSSMode modes[] = { sl::DLSSMode::eDLAA, sl::DLSSMode::eMaxQuality, sl::DLSSMode::eBalanced, sl::DLSSMode::eMaxPerformance, sl::DLSSMode::eUltraPerformance };
-		int selectedMode = -1;
+		sl::DLSSOptimalSettings settings[sizeof(modes) / sizeof(modes[0])];
+		bool validSettings[sizeof(modes) / sizeof(modes[0])];
+		Vector2 distance[sizeof(modes) / sizeof(modes[0])];
+		memset(validSettings, 0, sizeof(validSettings));
+
 		for(int i=0; i<sizeof(modes)/sizeof(modes[0]); i++)
 		{
 			sl::DLSSOptions dlssOptions = {};
@@ -70,29 +74,55 @@ public:
 			dlssOptions.outputHeight = outputHeight;
 			dlssOptions.mode = modes[i];
 
-			sl::DLSSOptimalSettings optimalSettings = {};
-			sl::Result result = StreamlineContext::get().slDLSSGetOptimalSettings(dlssOptions, optimalSettings);
+			
+			sl::Result result = StreamlineContext::get().slDLSSGetOptimalSettings(dlssOptions, settings[i]);
 			if (result != sl::Result::eOk)
 				continue;
+
+			sl::DLSSOptimalSettings &optimalSettings = settings[i];
 
 			if(	desiredWidth >= optimalSettings.renderWidthMin &&
 				desiredWidth <= optimalSettings.renderWidthMax &&
 				desiredHeight >= optimalSettings.renderHeightMin &&
 				desiredHeight <= optimalSettings.renderHeightMax) {
-				currentOptimalSettings = optimalSettings;
-				return modes[i];
+				validSettings[i] = true;
+				distance[i] = Vector2(fabsf((float)optimalSettings.optimalRenderWidth - (float)desiredWidth), fabsf((float)optimalSettings.optimalRenderHeight - (float)desiredHeight));
 			}
 		}
-		return sl::DLSSMode::eOff; // invalid mode
+
+		// now select the closest match
+		Vector2 closestDistance(1000000.0f, 1000000.0f);
+		int closestDistanceMatch = -1;
+		for (int i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
+			if (validSettings[i]) {
+				if (distance[i].length_squared() < closestDistance.length_squared()) {
+					closestDistanceMatch = i;
+					closestDistance = distance[i];
+				}
+			}
+		}
+
+		if (closestDistanceMatch != -1)
+			return modes[closestDistanceMatch];
+
+		ERR_FAIL_V_MSG(sl::DLSSMode::eOff, "Couldn't find an appropriate DLSS mode.");
 	}
 }; // end class
 }; // end namespace RendererRD
 
 
+static Vector<unsigned int> g_dlss_viewportIndices;
+static unsigned int g_dlss_viewportIndex = 1;
+
 DLSSContextInner::~DLSSContextInner() {
+	g_dlss_viewportIndices.push_back((unsigned int)viewport);
 }
 
 DLSSContextInner::DLSSContextInner() {
+	if(g_dlss_viewportIndices.size() == 0)
+		g_dlss_viewportIndices.push_back(g_dlss_viewportIndex++);
+	viewport = g_dlss_viewportIndices[g_dlss_viewportIndices.size()-1];
+	g_dlss_viewportIndices.remove_at(g_dlss_viewportIndices.size()-1);
 }
 
 DLSSEffect::DLSSEffect() {
@@ -163,17 +193,23 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		StreamlineContext::get().get_frame_token();
 
 	// Set DLSS options
-	if(p_params.exposure.is_null() || p_params.exposure.is_valid() == false)
-		context->currentDlssOptions.useAutoExposure = sl::Boolean::eTrue;
-	else
-		context->currentDlssOptions.useAutoExposure = sl::Boolean::eFalse;
+	{
+		
+		if(p_params.exposure.is_null() || p_params.exposure.is_valid() == false)
+			context->currentDlssOptions.useAutoExposure = sl::Boolean::eTrue;
+		else
+			context->currentDlssOptions.useAutoExposure = sl::Boolean::eFalse;
 
-	context->currentDlssOptions.colorBuffersHDR = sl::Boolean::eTrue;
+		context->currentDlssOptions.colorBuffersHDR = sl::Boolean::eTrue;
 
-	StreamlineContext::get().slDLSSSetOptions(context->viewport, context->currentDlssOptions);
+		sl::Result result = StreamlineContext::get().slDLSSSetOptions(context->viewport, context->currentDlssOptions);
+		if(result != sl::Result::eOk)
+			ERR_FAIL_MSG("Failed to call streamline slDLSSSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
+	}
 
 	// Decode mvecs
 	{
+		RD::get_singleton()->draw_command_begin_label("Decode Invalid Motion Vectors");
 		UniformSetCacheRD *uniform_set_cache = UniformSetCacheRD::get_singleton();
 		ERR_FAIL_NULL(uniform_set_cache);
 		MaterialStorage *material_storage = MaterialStorage::get_singleton();
@@ -208,6 +244,7 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		RD::get_singleton()->compute_list_add_barrier(compute_list);
 
 		RD::get_singleton()->compute_list_end();
+		RD::get_singleton()->draw_command_end_label();
 	}
 
 	// Set SL Options
@@ -238,8 +275,9 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		context->constants.mvecScale = sl::float2(1.0f, 1.0f);
 		context->constants.orthographicProjection = sl::Boolean::eFalse;
 		context->constants.reset = p_params.reset_accumulation ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-		if(StreamlineContext::get().slSetConstants(context->constants, *StreamlineContext::get().last_token, context->viewport) != sl::Result::eOk)
-			ERR_FAIL_MSG("Failed to call streamline slSetConstants.");
+		sl::Result result = StreamlineContext::get().slSetConstants(context->constants, *StreamlineContext::get().last_token, context->viewport);
+		if(result != sl::Result::eOk)
+			ERR_FAIL_MSG("Failed to call streamline slSetConstants. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
 
 	// Tag resources
@@ -279,17 +317,20 @@ void DLSSEffect::upscale(const Parameters &p_params) {
         assignResource(p_params.velocity, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent);
         assignResource(p_params.exposure, sl::kBufferTypeExposure, sl::ResourceLifecycle::eValidUntilPresent);
 
-        if (StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nullptr) != sl::Result::eOk)
-			ERR_FAIL_MSG("Failed to call streamline slSetTag.");
+		sl::Result result = StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nullptr);
+        if (result != sl::Result::eOk)
+			ERR_FAIL_MSG("Failed to call streamline slSetTag. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
 
 	// Evaluate DLSS Super Res
 	{
+		RD::get_singleton()->draw_command_begin_label("DLSS-SR");
 		const sl::BaseStructure *inputs[] = { &context->viewport };
 		void *nativeCmdlist = (void*)RD::get_singleton()->get_driver_resource(RenderingDevice::DriverResource::DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_DRAW);
-		auto dlssResult = StreamlineContext::get().slEvaluateFeature(sl::kFeatureDLSS, *StreamlineContext::get().last_token, inputs, 1, nativeCmdlist);
-		if (dlssResult != sl::Result::eOk)
-			ERR_FAIL_MSG("Failed to call streamline slEvaluateFeature for DLSS Super Resolution.");
+		sl::Result result = StreamlineContext::get().slEvaluateFeature(sl::kFeatureDLSS, *StreamlineContext::get().last_token, inputs, 1, nativeCmdlist);
+		if (result != sl::Result::eOk)
+			ERR_FAIL_MSG("Failed to call streamline slEvaluateFeature for DLSS Super Resolution. Result: " + String(StreamlineContext::result_to_string(result)));
+		RD::get_singleton()->draw_command_end_label();
 	}
 }
 #else
