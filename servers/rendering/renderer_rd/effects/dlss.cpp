@@ -227,14 +227,13 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		context->constants.cameraNear = p_params.z_near;
 		context->constants.cameraFar = p_params.z_far;
 		context->constants.cameraFOV = p_params.fovy;
-		context->constants.cameraMotionIncluded = sl::Boolean::eFalse;
+		context->constants.cameraMotionIncluded = sl::Boolean::eTrue;
 		context->constants.cameraAspectRatio = context->currentDlssOptions.outputWidth / context->currentDlssOptions.outputHeight;
 		context->constants.cameraPinholeOffset = sl::float2(0.0f, 0.0f);
 		context->constants.depthInverted = sl::Boolean::eTrue;
 		context->constants.motionVectors3D = sl::Boolean::eFalse;
 		context->constants.motionVectorsDilated = sl::Boolean::eFalse;
 		context->constants.motionVectorsJittered = sl::Boolean::eFalse;
-		context->constants.motionVectorsInvalidValue = -1.0f;
 		context->constants.jitterOffset = sl::float2(p_params.jitter.x, p_params.jitter.y);
 		context->constants.mvecScale = sl::float2(1.0f, 1.0f);
 		context->constants.orthographicProjection = sl::Boolean::eFalse;
