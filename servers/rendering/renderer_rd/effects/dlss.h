@@ -79,7 +79,7 @@ public:
 	~DLSSEffect();
 	DLSSContext *create_context(Size2i p_internal_size, Size2i p_target_size);
 	void upscale(const Parameters &p_params);
-
+	bool is_ready(DLSSContext* context);
 private:
 	Device device;
 };

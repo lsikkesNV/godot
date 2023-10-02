@@ -53,6 +53,7 @@ public:
 	sl::Constants constants = {};
 	sl::DLSSOptions currentDlssOptions = {};
 	sl::DLSSOptimalSettings currentOptimalSettings = {};
+	int delay = 4; // Give DLSS 4 frames to settle in case of resizes and buffer reconstructions.
 
 	DLSSContextInner();
 	virtual ~DLSSContextInner();
@@ -107,6 +108,8 @@ public:
 
 		ERR_FAIL_V_MSG(sl::DLSSMode::eOff, "Couldn't find an appropriate DLSS mode.");
 	}
+
+	
 }; // end class
 }; // end namespace RendererRD
 
@@ -263,11 +266,11 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 
 		context->constants.cameraNear = p_params.z_near;
 		context->constants.cameraFar = p_params.z_far;
-		context->constants.cameraFOV = p_params.fovy;
+		context->constants.cameraFOV = ( p_params.fovy / 180.0f ) * 3.1415f;
 		context->constants.cameraMotionIncluded = sl::Boolean::eTrue;
 		context->constants.cameraAspectRatio = context->currentDlssOptions.outputWidth / context->currentDlssOptions.outputHeight;
 		context->constants.cameraPinholeOffset = sl::float2(0.0f, 0.0f);
-		context->constants.depthInverted = sl::Boolean::eTrue;
+		context->constants.depthInverted = sl::Boolean::eFalse;
 		context->constants.motionVectors3D = sl::Boolean::eFalse;
 		context->constants.motionVectorsDilated = sl::Boolean::eFalse;
 		context->constants.motionVectorsJittered = sl::Boolean::eFalse;
@@ -322,7 +325,14 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 			ERR_FAIL_MSG("Failed to call streamline slSetTag. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
 
+	// Don't kick on DLSS yet, let it stabilize a bit.
+	if(context->delay > 0) {
+		context->delay -= 1;
+		return;
+	}
+
 	// Evaluate DLSS Super Res
+	if (context->currentDlssOptions.mode != sl::DLSSMode::eOff)
 	{
 		RD::get_singleton()->draw_command_begin_label("DLSS-SR");
 		const sl::BaseStructure *inputs[] = { &context->viewport };
@@ -333,6 +343,13 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		RD::get_singleton()->draw_command_end_label();
 	}
 }
+
+bool DLSSEffect::is_ready(DLSSContext* p_context) { 
+	DLSSContextInner* context = (DLSSContextInner*)p_context;
+	if(context->currentDlssOptions.mode == sl::DLSSMode::eOff)
+		return false; // unsupported mode.
+	return context->delay <= 0;
+}
 #else
 DLSSContext::~DLSSContext() {}
 DLSSContext::DLSSContext() {}
@@ -340,4 +357,5 @@ DLSSEffect::DLSSEffect() {}
 DLSSEffect::~DLSSEffect() {}
 DLSSContext *DLSSEffect::create_context(Size2i p_internal_size, Size2i p_target_size) {}
 void DLSSEffect::upscale(const Parameters &p_params) {}
+bool DLSSEffect::is_ready(DLSSContext* p_context) { return false; }
 #endif

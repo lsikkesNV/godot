@@ -64,6 +64,7 @@ class RenderSceneBuffersRD : public RenderSceneBuffers {
 	GDCLASS(RenderSceneBuffersRD, RenderSceneBuffers);
 
 private:
+	bool upscaler_ready = false;
 	bool can_be_storage = true;
 	uint32_t max_cluster_elements = 512;
 	RD::DataFormat base_data_format = RD::DATA_FORMAT_R16G16B16A16_SFLOAT;
@@ -213,7 +214,6 @@ public:
 	Ref<RenderBufferCustomDataRD> get_custom_data(const StringName &p_name) const;
 
 	// Getters
-
 	_FORCE_INLINE_ RID get_render_target() const { return render_target; }
 	_FORCE_INLINE_ uint32_t get_view_count() const { return view_count; }
 	_FORCE_INLINE_ Size2i get_internal_size() const { return internal_size; }
@@ -272,6 +272,9 @@ public:
 	// Upscaled.
 	void ensure_upscaled();
 
+	_FORCE_INLINE_ bool get_upscaler_ready() const { return upscaler_ready; }
+	_FORCE_INLINE_ void set_upscaler_ready(bool ready) { upscaler_ready = ready; }
+
 	_FORCE_INLINE_ bool has_upscaled_texture() const {
 		return has_texture(RB_SCOPE_BUFFERS, RB_TEX_COLOR_UPSCALED);
 	}
@@ -281,6 +284,8 @@ public:
 	_FORCE_INLINE_ RID get_upscaled_texture(const uint32_t p_layer) {
 		return get_texture_slice(RB_SCOPE_BUFFERS, RB_TEX_COLOR_UPSCALED, p_layer, 0);
 	}
+
+	
 
 	// Velocity, currently only used by TAA (Clustered) but we'll be using this in other places soon too.
 

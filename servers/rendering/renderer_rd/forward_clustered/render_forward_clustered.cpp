@@ -118,6 +118,7 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_dlss(Rende
 }
 
 void RenderForwardClustered::RenderBufferDataForwardClustered::free_data() {
+
 	// JIC, should already have been cleared
 	if (render_buffers) {
 		render_buffers->clear_context(RB_SCOPE_FORWARD_CLUSTERED);
@@ -2193,6 +2194,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	if (rb_data.is_valid() && (using_fsr2 || using_taa || using_dlss)) {
 		if (using_fsr2) {
 			rb->ensure_upscaled();
+			rb->set_upscaler_ready(true);
 			rb_data->ensure_fsr2(fsr2_effect);
 
 			RID exposure;
@@ -2271,6 +2273,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				params.cam_projection = cur_proj;
 				params.cam_transform = cur_transform;
 
+				rb->set_upscaler_ready(dlss_effect->is_ready(rb_data->get_dlss_context()));
 				dlss_effect->upscale(params);
 			}
 		} else if (using_taa) {
