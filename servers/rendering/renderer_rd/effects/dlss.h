@@ -66,6 +66,7 @@ public:
 		float z_near = 0.0f;
 		float z_far = 0.0f;
 		float fovy = 0.0f;
+		bool reverse_depth = false;
 		Vector2 jitter;
 		float delta_time = 0.0f;
 		float sharpness = 0.0f;
@@ -73,6 +74,7 @@ public:
 		Projection reprojection;
 		Projection cam_projection;
 		Transform3D cam_transform;
+		bool dlss_g = false;
 	};
 
 	DLSSEffect();

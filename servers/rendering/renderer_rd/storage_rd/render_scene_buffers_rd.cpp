@@ -143,6 +143,7 @@ void RenderSceneBuffersRD::configure(const RenderSceneBuffersConfiguration *p_co
 	texture_mipmap_bias = p_config->get_texture_mipmap_bias();
 	use_taa = p_config->get_use_taa();
 	use_debanding = p_config->get_use_debanding();
+	frame_generation = p_config->get_use_frame_generation();
 
 	ERR_FAIL_COND_MSG(view_count == 0, "Must have at least 1 view");
 

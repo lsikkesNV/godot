@@ -74,14 +74,12 @@ public:
 			dlssOptions.outputWidth = outputWidth;
 			dlssOptions.outputHeight = outputHeight;
 			dlssOptions.mode = modes[i];
-
 			
 			sl::Result result = StreamlineContext::get().slDLSSGetOptimalSettings(dlssOptions, settings[i]);
 			if (result != sl::Result::eOk)
 				continue;
 
 			sl::DLSSOptimalSettings &optimalSettings = settings[i];
-
 			if(	desiredWidth >= optimalSettings.renderWidthMin &&
 				desiredWidth <= optimalSettings.renderWidthMax &&
 				desiredHeight >= optimalSettings.renderHeightMin &&
@@ -108,8 +106,6 @@ public:
 
 		ERR_FAIL_V_MSG(sl::DLSSMode::eOff, "Couldn't find an appropriate DLSS mode.");
 	}
-
-	
 }; // end class
 }; // end namespace RendererRD
 
@@ -210,6 +206,17 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 			ERR_FAIL_MSG("Failed to call streamline slDLSSSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
 
+
+	// Set DLSS-G options (only enabled in game mode)
+	if(StreamlineContext::get().slDLSSGSetOptions != nullptr && StreamlineContext::get().isGame == true)
+	{
+		sl::DLSSGOptions dlssGOptions{};
+		dlssGOptions.mode = p_params.dlss_g && context->delay == 0 ? sl::DLSSGMode::eOn : sl::DLSSGMode::eOff;
+		sl::Result result = StreamlineContext::get().slDLSSGSetOptions(context->viewport, dlssGOptions);
+		if(result != sl::Result::eOk)
+			ERR_FAIL_MSG("Failed to call streamline slDLSSGSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
+	}
+
 	// Decode mvecs
 	{
 		RD::get_singleton()->draw_command_begin_label("Decode Invalid Motion Vectors");
@@ -268,9 +275,9 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		context->constants.cameraFar = p_params.z_far;
 		context->constants.cameraFOV = ( p_params.fovy / 180.0f ) * 3.1415f;
 		context->constants.cameraMotionIncluded = sl::Boolean::eTrue;
-		context->constants.cameraAspectRatio = context->currentDlssOptions.outputWidth / context->currentDlssOptions.outputHeight;
+		context->constants.cameraAspectRatio = static_cast<float>(context->currentDlssOptions.outputWidth) / static_cast<float>(context->currentDlssOptions.outputHeight);
 		context->constants.cameraPinholeOffset = sl::float2(0.0f, 0.0f);
-		context->constants.depthInverted = sl::Boolean::eFalse;
+		context->constants.depthInverted = p_params.reverse_depth ? sl::Boolean::eTrue : sl::Boolean::eFalse;
 		context->constants.motionVectors3D = sl::Boolean::eFalse;
 		context->constants.motionVectorsDilated = sl::Boolean::eFalse;
 		context->constants.motionVectorsJittered = sl::Boolean::eFalse;
@@ -325,14 +332,8 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 			ERR_FAIL_MSG("Failed to call streamline slSetTag. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
 
-	// Don't kick on DLSS yet, let it stabilize a bit.
-	if(context->delay > 0) {
-		context->delay -= 1;
-		return;
-	}
-
 	// Evaluate DLSS Super Res
-	if (context->currentDlssOptions.mode != sl::DLSSMode::eOff)
+	if (context->currentDlssOptions.mode != sl::DLSSMode::eOff && context->delay == 0)
 	{
 		RD::get_singleton()->draw_command_begin_label("DLSS-SR");
 		const sl::BaseStructure *inputs[] = { &context->viewport };
@@ -341,6 +342,11 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		if (result != sl::Result::eOk)
 			ERR_FAIL_MSG("Failed to call streamline slEvaluateFeature for DLSS Super Resolution. Result: " + String(StreamlineContext::result_to_string(result)));
 		RD::get_singleton()->draw_command_end_label();
+	}
+
+	// Reduce frame delay counter.
+	if (context->delay > 0) {
+		context->delay -= 1;
 	}
 }
 

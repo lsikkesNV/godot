@@ -2200,6 +2200,7 @@ void RenderingServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("viewport_set_scaling_3d_mode", "viewport", "scaling_3d_mode"), &RenderingServer::viewport_set_scaling_3d_mode);
 	ClassDB::bind_method(D_METHOD("viewport_set_scaling_3d_scale", "viewport", "scale"), &RenderingServer::viewport_set_scaling_3d_scale);
+	ClassDB::bind_method(D_METHOD("viewport_set_frame_generation", "viewport", "frame_generation"), &RenderingServer::viewport_set_frame_generation);
 	ClassDB::bind_method(D_METHOD("viewport_set_fsr_sharpness", "viewport", "sharpness"), &RenderingServer::viewport_set_fsr_sharpness);
 	ClassDB::bind_method(D_METHOD("viewport_set_texture_mipmap_bias", "viewport", "mipmap_bias"), &RenderingServer::viewport_set_texture_mipmap_bias);
 	ClassDB::bind_method(D_METHOD("viewport_set_update_mode", "viewport", "update_mode"), &RenderingServer::viewport_set_update_mode);
@@ -3001,6 +3002,7 @@ void RenderingServer::init() {
 
 	// NVIDIA
 	GLOBAL_DEF("rendering/nvidia/streamline_log", false);
+	GLOBAL_DEF("rendering/nvidia/streamline_imgui", false);
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/nvidia/reflex_mode", PROPERTY_HINT_RANGE, "0,2,1"), 0);
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/nvidia/reflex_frame_limit_us", PROPERTY_HINT_RANGE, "0,1000000,1"), 0);
 	// /NVIDIA

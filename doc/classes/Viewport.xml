@@ -333,6 +333,9 @@
 			When using FSR upscaling, AMD recommends exposing the following values as preset options to users "Ultra Quality: 0.77", "Quality: 0.67", "Balanced: 0.59", "Performance: 0.5" instead of exposing the entire scale.
 			To control this property on the root viewport, set the [member ProjectSettings.rendering/scaling_3d/scale] project setting.
 		</member>
+		<member name="frame_generation" type="bool" setter="set_frame_generation" getter="get_frame_generation" default="false">
+			Enables Frame Generation technology on this viewport, if available. (either DLSS 3.0 or FSR 3.0)
+		</member>
 		<member name="screen_space_aa" type="int" setter="set_screen_space_aa" getter="get_screen_space_aa" enum="Viewport.ScreenSpaceAA" default="0">
 			Sets the screen-space antialiasing method used. Screen-space antialiasing works by selectively blurring edges in a post-process shader. It differs from MSAA which takes multiple coverage samples while rendering objects. Screen-space AA methods are typically faster than MSAA and will smooth out specular aliasing, but tend to make scenes appear blurry.
 		</member>

@@ -3674,6 +3674,14 @@
 				When using FSR upscaling, AMD recommends exposing the following values as preset options to users "Ultra Quality: 0.77", "Quality: 0.67", "Balanced: 0.59", "Performance: 0.5" instead of exposing the entire scale.
 			</description>
 		</method>
+		<method name="viewport_set_frame_generation">
+			<return type="void" />
+			<param index="0" name="viewport" type="RID" />
+			<param index="1" name="frame_generation" type="bool" />
+			<description>
+				Toggles Frame Generation technology on a viewport. (Either DLSS 3.0 or FSR 3.0)
+			</description>
+		</method>
 		<method name="viewport_set_scenario">
 			<return type="void" />
 			<param index="0" name="viewport" type="RID" />

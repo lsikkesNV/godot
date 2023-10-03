@@ -4251,6 +4251,20 @@ Viewport::Scaling3DMode Viewport::get_scaling_3d_mode() const {
 	return scaling_3d_mode;
 }
 
+void Viewport::set_frame_generation(bool p_frame_generation) {
+	ERR_MAIN_THREAD_GUARD;
+	if (frame_generation == p_frame_generation) {
+		return;
+	}
+
+	frame_generation = p_frame_generation;
+	RS::get_singleton()->viewport_set_frame_generation(viewport, p_frame_generation);
+}
+
+bool Viewport::get_frame_generation() const {
+	return frame_generation;
+}
+
 void Viewport::set_scaling_3d_scale(float p_scaling_3d_scale) {
 	ERR_MAIN_THREAD_GUARD;
 	// Clamp to reasonable values that are actually useful.
@@ -4473,6 +4487,9 @@ void Viewport::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_scaling_3d_scale", "scale"), &Viewport::set_scaling_3d_scale);
 	ClassDB::bind_method(D_METHOD("get_scaling_3d_scale"), &Viewport::get_scaling_3d_scale);
 
+	ClassDB::bind_method(D_METHOD("set_frame_generation", "frame_generation"), &Viewport::set_frame_generation);
+	ClassDB::bind_method(D_METHOD("get_frame_generation"), &Viewport::get_frame_generation);
+
 	ClassDB::bind_method(D_METHOD("set_fsr_sharpness", "fsr_sharpness"), &Viewport::set_fsr_sharpness);
 	ClassDB::bind_method(D_METHOD("get_fsr_sharpness"), &Viewport::get_fsr_sharpness);
 
@@ -4512,6 +4529,7 @@ void Viewport::_bind_methods() {
 	ADD_GROUP("Scaling 3D", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "scaling_3d_mode", PROPERTY_HINT_ENUM, "Bilinear (Fastest),FSR 1.0 (Fast),FSR 2.2 (Slow)"), "set_scaling_3d_mode", "get_scaling_3d_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "scaling_3d_scale", PROPERTY_HINT_RANGE, "0.25,2.0,0.01"), "set_scaling_3d_scale", "get_scaling_3d_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "frame_generation"), "set_frame_generation", "get_frame_generation");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_mipmap_bias", PROPERTY_HINT_RANGE, "-2,2,0.001"), "set_texture_mipmap_bias", "get_texture_mipmap_bias");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fsr_sharpness", PROPERTY_HINT_RANGE, "0,2,0.1"), "set_fsr_sharpness", "get_fsr_sharpness");
 #endif

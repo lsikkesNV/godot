@@ -34,6 +34,10 @@ public:
 	PFun_slDLSSGetState *slDLSSGetState = nullptr;
 	PFun_slDLSSSetOptions *slDLSSSetOptions = nullptr;
 
+	// DLSS Frame Generation
+	PFun_slDLSSGGetState *slDLSSGGetState = nullptr;
+	PFun_slDLSSGSetOptions *slDLSSGSetOptions = nullptr;
+
 	void load_functions();
 	void load_functions_post_init();
 	static const char* result_to_string(sl::Result result);
@@ -93,6 +97,9 @@ void StreamlineContext::load_functions_post_init() {
 	slGetFeatureFunction(sl::kFeatureDLSS, "slDLSSGetOptimalSettings", (void*&)this->slDLSSGetOptimalSettings);
 	slGetFeatureFunction(sl::kFeatureDLSS, "slDLSSGetState", (void*&)this->slDLSSGetState);
 	slGetFeatureFunction(sl::kFeatureDLSS, "slDLSSSetOptions", (void*&)this->slDLSSSetOptions);
+
+	slGetFeatureFunction(sl::kFeatureDLSS_G, "slDLSSGGetState", (void *&)this->slDLSSGGetState);
+	slGetFeatureFunction(sl::kFeatureDLSS_G, "slDLSSGSetOptions", (void *&)this->slDLSSGSetOptions);
 }
 
 VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhysicalDevice device) {
@@ -226,6 +233,10 @@ void VulkanContext::streamline_initialize() {
 	{
 		featuresToLoad.push_back(sl::kFeatureDLSS_G);
 		featuresToLoad.push_back(sl::kFeatureReflex);
+		if(bool(GLOBAL_GET("rendering/nvidia/streamline_imgui")) == true)
+		{
+			featuresToLoad.push_back(sl::kFeatureImGUI);
+		}
 	}
 	pref.featuresToLoad = featuresToLoad.ptr();
 	pref.numFeaturesToLoad = featuresToLoad.size();

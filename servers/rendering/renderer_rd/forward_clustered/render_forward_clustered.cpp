@@ -2258,6 +2258,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				params.reactive = rb->get_internal_texture_reactive(v);
 				params.exposure = exposure;
 				params.output = rb->get_upscaled_texture(v);
+				params.dlss_g = rb->get_frame_generation();
 				params.z_near = p_render_data->scene_data->z_near;
 				params.z_far = p_render_data->scene_data->z_far;
 				params.fovy = fovy;
