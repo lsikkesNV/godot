@@ -139,11 +139,11 @@ void RenderSceneBuffersRD::configure(const RenderSceneBuffersConfiguration *p_co
 	msaa_3d = p_config->get_msaa_3d();
 	screen_space_aa = p_config->get_screen_space_aa();
 
+	frame_generation = p_config->get_use_frame_generation();
 	fsr_sharpness = p_config->get_fsr_sharpness();
 	texture_mipmap_bias = p_config->get_texture_mipmap_bias();
 	use_taa = p_config->get_use_taa();
 	use_debanding = p_config->get_use_debanding();
-	frame_generation = p_config->get_use_frame_generation();
 
 	ERR_FAIL_COND_MSG(view_count == 0, "Must have at least 1 view");
 
@@ -238,6 +238,7 @@ void RenderSceneBuffersRD::configure_for_reflections(const Size2i p_reflection_s
 	screen_space_aa = RS::VIEWPORT_SCREEN_SPACE_AA_DISABLED;
 	use_taa = false;
 	use_debanding = false;
+	frame_generation = false;
 	view_count = 1;
 
 	// cleanout any old buffers we had.
