@@ -1874,6 +1874,8 @@ Error VulkanContext::_clean_up_swap_chain(Window *window) {
 Error VulkanContext::_update_swap_chain(Window *window) {
 	VkResult err;
 
+	streamline_emit(RenderingDevice::ModifySwapchain);
+
 	if (window->swapchain) {
 		_clean_up_swap_chain(window);
 	}

@@ -53,7 +53,7 @@ public:
 	sl::Constants constants = {};
 	sl::DLSSOptions currentDlssOptions = {};
 	sl::DLSSOptimalSettings currentOptimalSettings = {};
-	int delay = 4; // Give DLSS 4 frames to settle in case of resizes and buffer reconstructions.
+	int delay = 16; // Give DLSS 16 frames to settle in case of resizes and buffer reconstructions.
 
 	DLSSContextInner();
 	virtual ~DLSSContextInner();
@@ -206,17 +206,6 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 			ERR_FAIL_MSG("Failed to call streamline slDLSSSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
 
-
-	// Set DLSS-G options (only enabled in game mode)
-	if(StreamlineContext::get().slDLSSGSetOptions != nullptr && StreamlineContext::get().isGame == true)
-	{
-		sl::DLSSGOptions dlssGOptions{};
-		dlssGOptions.mode = p_params.dlss_g && context->delay == 0 ? sl::DLSSGMode::eOn : sl::DLSSGMode::eOff;
-		sl::Result result = StreamlineContext::get().slDLSSGSetOptions(context->viewport, dlssGOptions);
-		if(result != sl::Result::eOk)
-			ERR_FAIL_MSG("Failed to call streamline slDLSSGSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
-	}
-
 	// Decode mvecs
 	{
 		RD::get_singleton()->draw_command_begin_label("Decode Invalid Motion Vectors");
@@ -330,6 +319,38 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		sl::Result result = StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nullptr);
         if (result != sl::Result::eOk)
 			ERR_FAIL_MSG("Failed to call streamline slSetTag. Result: " + String(StreamlineContext::result_to_string(result)));
+	}
+
+	// Toggle DLSS Frame Generation (only enabled in game mode)
+	if(StreamlineContext::get().slDLSSGSetOptions != nullptr && StreamlineContext::get().isGame == true)
+	{
+		sl::DLSSGOptions dlssGOptions{};
+		bool wantActivateDLSSG = p_params.dlss_g;
+		bool canActivateDLSSG = StreamlineContext::get().dlssg_delay == 0 && context->delay == 0;
+
+		// Disable previous DLSS-G context if needed
+		if( StreamlineContext::get().dlssg_viewport != sl::ViewportHandle(-1) && ( (wantActivateDLSSG == false && StreamlineContext::get().dlssg_viewport == context->viewport) || (wantActivateDLSSG && StreamlineContext::get().dlssg_viewport != context->viewport) ) ) 
+		{
+			WARN_PRINT("Disabling DLSS-G on viewport: " + itos((unsigned int)StreamlineContext::get().dlssg_viewport));
+			dlssGOptions.mode = sl::DLSSGMode::eOff;
+			sl::Result result = StreamlineContext::get().slDLSSGSetOptions(StreamlineContext::get().dlssg_viewport, dlssGOptions);
+			if(result != sl::Result::eOk)
+				ERR_FAIL_MSG("Failed to call streamline slDLSSGSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
+
+			StreamlineContext::get().dlssg_viewport = sl::ViewportHandle(-1);
+		}
+
+		// Enable new DLSS-G context if needed
+		if(canActivateDLSSG && wantActivateDLSSG && StreamlineContext::get().dlssg_viewport != context->viewport) {
+			WARN_PRINT("Enabling DLSS-G on viewport: " + itos((unsigned int)context->viewport));
+
+			dlssGOptions.mode = sl::DLSSGMode::eOn;
+			sl::Result result = StreamlineContext::get().slDLSSGSetOptions(context->viewport, dlssGOptions);
+			if(result != sl::Result::eOk)
+				ERR_FAIL_MSG("Failed to call streamline slDLSSGSetOptions. Result: " + String(StreamlineContext::result_to_string(result)));
+
+			StreamlineContext::get().dlssg_viewport = context->viewport;
+		} 
 	}
 
 	// Evaluate DLSS Super Res

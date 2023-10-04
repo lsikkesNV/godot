@@ -1313,6 +1313,7 @@ public:
 
 	enum MarkerType	{
 		BeforeMessageLoop,
+		ModifySwapchain,
 		BeginSimulation,
 		EndSimulation,
 		BeginRender,

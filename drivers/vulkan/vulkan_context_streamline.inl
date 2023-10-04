@@ -20,6 +20,7 @@ public:
 	PFun_slEvaluateFeature *slEvaluateFeature = nullptr;
 	PFun_slSetTag *slSetTag = nullptr;
 	PFun_slSetConstants *slSetConstants = nullptr;
+	PFun_slSetFeatureLoaded *slSetFeatureLoaded = nullptr;
 
 	// Reflex
 	sl::ReflexOptions reflex_options;
@@ -47,12 +48,17 @@ public:
 	void reflex_get_state(sl::ReflexState& reflexState);
 	sl::FrameToken* get_frame_token();
 
+	void dlssg_disable();
+
 	unsigned long long convert_rdformat_to_vkformat(RenderingDevice::DataFormat format);
 
 	static StreamlineContext &get();
 
 	sl::FrameToken* last_token = nullptr;
 	bool isGame = false;
+
+	sl::ViewportHandle dlssg_viewport;
+	int dlssg_delay = 0;
 
 #ifdef STREAMLINE_IMPLEMENTATION
 	VulkanContext::StreamlineCapabilities enumerate_support(VkPhysicalDevice device);
@@ -78,6 +84,7 @@ void StreamlineContext::load_functions() {
 	this->slIsFeatureSupported = (PFun_slIsFeatureSupported *)GetProcAddress(streamline, "slIsFeatureSupported");
 	this->slGetFeatureFunction = (PFun_slGetFeatureFunction *)GetProcAddress(streamline, "slGetFeatureFunction");
 	this->slGetNewFrameToken = (PFun_slGetNewFrameToken *)GetProcAddress(streamline, "slGetNewFrameToken");
+	this->slSetFeatureLoaded = (PFun_slSetFeatureLoaded *)GetProcAddress(streamline, "slSetFeatureLoaded");
 
 	this->slAllocateResources = (PFun_slAllocateResources *)GetProcAddress(streamline, "slAllocateResources");
 	this->slFreeResources = (PFun_slFreeResources *)GetProcAddress(streamline, "slFreeResources");
@@ -112,6 +119,25 @@ VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhy
 		support.reflexAvailable = this->slIsFeatureSupported(sl::kFeatureReflex, adapterInfo) == sl::Result::eOk;
 	}
 	return support;
+}
+
+void StreamlineContext::dlssg_disable()
+{
+	if (isGame == false) // Disable DLSS-G for editor or project settings.
+		return;
+
+	dlssg_delay = 100;
+	
+	if(slDLSSGSetOptions && dlssg_viewport != -1)
+	{
+		WARN_PRINT("Force disabling DLSS-G on viewport: " + itos((unsigned int)StreamlineContext::get().dlssg_viewport));
+
+		sl::DLSSGOptions dlssGOptions{};
+		dlssGOptions.mode = sl::DLSSGMode::eOff;
+		slDLSSGSetOptions(dlssg_viewport, dlssGOptions);
+
+		dlssg_viewport = sl::ViewportHandle(-1);
+	}
 }
 
 void StreamlineContext::reflex_set_options(const sl::ReflexOptions& opts) {
@@ -339,11 +365,17 @@ void VulkanContext::streamline_emit(RenderingDevice::MarkerType marker) {
 		return;
 	}
 
-	static unsigned long long lastPingFrameDetected = 0; // TODO: Do this differently. Multi window?
+	static unsigned long long lastPingFrameDetected = 0; // TODO: Do this differently to support multi window?
 	sl::ReflexMarker sl_marker;
 	switch(marker)
 	{
+		case RenderingDevice::ModifySwapchain:
+			StreamlineContext::get().dlssg_disable();
+			return;
 		case RenderingDevice::BeforeMessageLoop:
+			if (StreamlineContext::get().dlssg_delay > 0)
+				--StreamlineContext::get().dlssg_delay;
+				
 			if (StreamlineContext::get().reflex_options_dirty)
 				StreamlineContext::get().reflex_set_options(StreamlineContext::get().reflex_options);
 			streamline_framemarker = StreamlineContext::get().get_frame_token();
