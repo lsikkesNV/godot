@@ -200,6 +200,7 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 			context->currentDlssOptions.useAutoExposure = sl::Boolean::eFalse;
 
 		context->currentDlssOptions.colorBuffersHDR = sl::Boolean::eTrue;
+		context->currentDlssOptions.sharpness = p_params.sharpness;
 
 		sl::Result result = StreamlineContext::get().slDLSSSetOptions(context->viewport, context->currentDlssOptions);
 		if(result != sl::Result::eOk)
@@ -314,9 +315,11 @@ void DLSSEffect::upscale(const Parameters &p_params) {
         assignResource(p_params.output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent);
         assignResource(p_params.depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilPresent);
         assignResource(p_params.velocity, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent);
-        assignResource(p_params.exposure, sl::kBufferTypeExposure, sl::ResourceLifecycle::eValidUntilPresent);
+        //assignResource(p_params.exposure, sl::kBufferTypeExposure, sl::ResourceLifecycle::eValidUntilPresent); // TODO: Passing in exposure seems to make things worse, not better?
 
-		sl::Result result = StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nullptr);
+		void *nativeCmdlist = (void*)RD::get_singleton()->get_driver_resource(RenderingDevice::DriverResource::DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_DRAW);
+
+		sl::Result result = StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nativeCmdlist);
         if (result != sl::Result::eOk)
 			ERR_FAIL_MSG("Failed to call streamline slSetTag. Result: " + String(StreamlineContext::result_to_string(result)));
 	}
