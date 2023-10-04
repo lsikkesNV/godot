@@ -92,9 +92,6 @@ vec3 tonemap_reinhard(vec3 color, float p_white) {
 	return (p_white * color + color) / (color * p_white + p_white);
 }
 
-// 0: Default, 1: Golden, 2: Punchy
-#define AGX_LOOK 1
-
 // Mean error^2: 3.6705141e-06
 vec3 agxDefaultContrastApprox(vec3 x) {
   vec3 x2 = x * x;
@@ -141,12 +138,13 @@ vec3 agxEotf(vec3 val) {
   val = agx_mat_inv * val;
   
   // sRGB IEC 61966-2-1 2.2 Exponent Reference EOTF Display
-  val = pow(val, vec3(2.2));
+  //val = pow(val, vec3(2.2));
+  val = srgb_to_linear(val);
 
   return val;
 }
 
-vec3 agxLook(vec3 val) {
+vec3 agxLook(vec3 val, float look) {
   const vec3 lw = vec3(0.2126, 0.7152, 0.0722);
   float luma = dot(val, lw);
   
@@ -156,27 +154,37 @@ vec3 agxLook(vec3 val) {
   vec3 power = vec3(1.0);
   float sat = 1.0;
  
-#if AGX_LOOK == 1
-  // Golden
-  slope = vec3(1.0, 0.9, 0.5);
-  power = vec3(0.8);
-  sat = 0.8;
-#elif AGX_LOOK == 2
-  // Punchy
-  slope = vec3(1.0);
-  power = vec3(1.35, 1.35, 1.35);
-  sat = 1.4;
-#endif
+  if(look >= 2.0f)
+  {
+    // Golden
+    slope = vec3(1.0, 0.9, 0.5);
+    power = vec3(0.8);
+    sat = 0.8;
+  } else if(look >= 1.0f) {
+    // Punchy
+	float lookFactor = look - 1.0f;
+	float powerValue = 1.35 - (.35 * lookFactor);
+	float satValue = 1.4 - (.4 * lookFactor);
+    power = vec3(powerValue, powerValue, powerValue);
+    sat = satValue;
+  } else {
+    // Normal
+	float lookFactor = look;
+	float powerValue = 1.0 + (.35 * lookFactor);
+	float slopeValue = 1.0 + (.15 * lookFactor);
+    power = vec3(powerValue, powerValue, powerValue);
+	slope = vec3(slopeValue, slopeValue, slopeValue);
+  }
   
   // ASC CDL
   val = pow(val * slope + offset, power);
   return luma + sat * (val - luma);
 }
 
-vec3 tonemap_agx(vec3 col)
+vec3 tonemap_agx(vec3 col, float white)
 {
 	col = agx(col);
-  	col = agxLook(col);
+  	col = agxLook(col, white);
   	col = agxEotf(col);
 	return col;
 }
@@ -214,6 +222,6 @@ vec3 apply_tonemapping(vec3 color, float p_white) { // inputs are LINEAR, always
 	} else if (tonemapper == TONEMAPPER_ACES) { 
 		return tonemap_aces(max(vec3(0.0f), color), p_white);
 	} else if (tonemapper == TONEMAPPER_AGX) { 
-		return tonemap_agx(max(vec3(0.0f), color));
+		return tonemap_agx(max(vec3(0.0f), color), p_white);
 	}
 }
