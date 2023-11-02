@@ -550,7 +550,7 @@ void SceneImportSettings::_update_camera() {
 	camera->set_orthogonal(camera_size * zoom, 0.0001, camera_size * 2);
 
 	Transform3D xf;
-	xf.basis = Basis(Vector3(1, 0, 0), rot_x) * Basis(Vector3(0, 1, 0), rot_y);
+	xf.basis = Basis(Vector3(0, 1, 0), rot_y) * Basis(Vector3(1, 0, 0), rot_x);
 	xf.origin = center;
 	xf.translate_local(0, 0, camera_size);
 
@@ -1141,9 +1141,11 @@ void SceneImportSettings::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_THEME_CHANGED: {
+			action_menu->begin_bulk_theme_override();
 			action_menu->add_theme_style_override("normal", get_theme_stylebox("normal", "Button"));
 			action_menu->add_theme_style_override("hover", get_theme_stylebox("hover", "Button"));
 			action_menu->add_theme_style_override("pressed", get_theme_stylebox("pressed", "Button"));
+			action_menu->end_bulk_theme_override();
 
 			if (animation_player != nullptr && animation_player->is_playing()) {
 				animation_play_button->set_icon(get_editor_theme_icon(SNAME("Pause")));
