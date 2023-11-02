@@ -281,7 +281,6 @@ void VulkanContext::streamline_initialize() {
 	sl::Result result = StreamlineContext::get().slInit(pref, sl::kSDKVersion);
 	ERR_FAIL_COND_MSG(result != sl::Result::eOk, StreamlineContext::result_to_string(result));
 
-	StreamlineContext::get().load_functions_post_init();
 #endif
 }
 
@@ -306,6 +305,8 @@ void VulkanContext::streamline_enumerate_capabilities() {
 
 void VulkanContext::streamline_init_post_device() {
 #if USE_STREAMLINE
+	StreamlineContext::get().load_functions_post_init();
+	
 	if(streamline_capabilities.reflexAvailable)
 	{
 		sl::ReflexOptions reflex_options = {};
