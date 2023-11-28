@@ -2290,7 +2290,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				RendererRD::DLSSEffect::Parameters params;
 				params.context = rb_data->get_dlss_context();
 				params.internal_size = rb->get_internal_size();
-				params.sharpness = CLAMP(1.0f - (rb->get_fsr_sharpness() / 2.0f), 0.0f, 1.0f);
+				params.sharpness = CLAMP((rb->get_fsr_sharpness() / 2.0f), 0.0f, 1.0f);
 				params.color = rb->get_internal_texture(v);
 				params.depth = rb->get_depth_texture(v);
 				params.velocity = rb->get_velocity_buffer(false, v);

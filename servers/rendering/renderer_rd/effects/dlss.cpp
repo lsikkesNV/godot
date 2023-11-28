@@ -187,6 +187,36 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 	if(StreamlineContext::get().slDLSSSetOptions == nullptr)
 		return;
 
+	// Get command buffer.
+	void *nativeCmdlist = (void*)RD::get_singleton()->get_driver_resource(RenderingDevice::DriverResource::DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_DRAW);
+
+	// Helper function for tagging resources.
+	auto assignResource = [this](sl::Resource* resources, sl::ResourceTag* resourceTags, int& numResources, RID textureRID, sl::BufferType bufferType, sl::ResourceLifecycle lifecycle) {
+		if (textureRID.is_valid() == false || textureRID.is_null() == true)
+			return;	
+
+		RD::TextureFormat texture_format = RD::get_singleton()->texture_get_format(textureRID);
+		uint64_t texture_image = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE, textureRID);
+		uint64_t texture_view = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW, textureRID);
+		uint64_t texture_device_memory = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_DEVICE_MEMORY, textureRID);;
+		uint64_t texture_state = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_LAYOUT, textureRID);
+		uint64_t texture_vkformat = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_NATIVE_TEXTURE_FORMAT, textureRID);
+		uint64_t texture_usage_flags = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_USAGE_FLAGS, textureRID);
+		auto& destinationResource = resources[numResources];
+		destinationResource = sl::Resource(sl::ResourceType::eTex2d,
+			(void*)texture_image, (void*)texture_device_memory, (void*)texture_view, texture_state);
+		destinationResource.width = texture_format.width;
+		destinationResource.height = texture_format.height;
+		destinationResource.nativeFormat = texture_vkformat;
+		destinationResource.arrayLayers = texture_format.array_layers;
+		destinationResource.flags = 0;
+		destinationResource.mipLevels = texture_format.mipmaps;
+		destinationResource.usage = texture_usage_flags;
+
+		resourceTags[numResources] = sl::ResourceTag(resources + numResources, bufferType, lifecycle, nullptr);
+		++numResources;
+	};
+		
 	// Begin frame if needed
 	if (StreamlineContext::get().last_token == nullptr)
 		StreamlineContext::get().get_frame_token();
@@ -200,7 +230,7 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 			context->currentDlssOptions.useAutoExposure = sl::Boolean::eFalse;
 
 		context->currentDlssOptions.colorBuffersHDR = sl::Boolean::eTrue;
-		context->currentDlssOptions.sharpness = p_params.sharpness;
+		context->currentDlssOptions.sharpness = 0.0f;
 
 		sl::Result result = StreamlineContext::get().slDLSSSetOptions(context->viewport, context->currentDlssOptions);
 		if(result != sl::Result::eOk)
@@ -286,38 +316,11 @@ void DLSSEffect::upscale(const Parameters &p_params) {
         sl::ResourceTag resourceTags[6];
         int numResources = 0;
 
-        auto assignResource = [this, &resources, &resourceTags, &numResources](RID textureRID, sl::BufferType bufferType, sl::ResourceLifecycle lifecycle) {
-            if (textureRID.is_valid() == false || textureRID.is_null() == true)
-				return;	
-
-			RD::TextureFormat texture_format = RD::get_singleton()->texture_get_format(textureRID);
-			uint64_t texture_image = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE, textureRID);
-			uint64_t texture_view = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW, textureRID);
-			uint64_t texture_device_memory = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_DEVICE_MEMORY, textureRID);;
-			uint64_t texture_state = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_LAYOUT, textureRID);
-			uint64_t texture_vkformat = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_NATIVE_TEXTURE_FORMAT, textureRID);
-			uint64_t texture_usage_flags = RD::get_singleton()->get_driver_resource(RD::DriverResource::DRIVER_RESOURCE_VULKAN_IMAGE_USAGE_FLAGS, textureRID);
-			auto& destinationResource = resources[numResources];
-			destinationResource = sl::Resource(sl::ResourceType::eTex2d,
-				(void*)texture_image, (void*)texture_device_memory, (void*)texture_view, texture_state);
-			destinationResource.width = texture_format.width;
-			destinationResource.height = texture_format.height;
-			destinationResource.nativeFormat = texture_vkformat;
-			destinationResource.arrayLayers = texture_format.array_layers;
-			destinationResource.flags = 0;
-			destinationResource.mipLevels = texture_format.mipmaps;
-			destinationResource.usage = texture_usage_flags;
-
-			resourceTags[numResources] = sl::ResourceTag(resources + numResources, bufferType, lifecycle, nullptr);
-			++numResources;
-        };
-        assignResource(p_params.color, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilPresent);
-        assignResource(p_params.output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent);
-        assignResource(p_params.depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilPresent);
-        assignResource(p_params.velocity, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent);
-        //assignResource(p_params.exposure, sl::kBufferTypeExposure, sl::ResourceLifecycle::eValidUntilPresent); // TODO: Passing in exposure seems to make things worse, not better?
-
-		void *nativeCmdlist = (void*)RD::get_singleton()->get_driver_resource(RenderingDevice::DriverResource::DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_DRAW);
+        assignResource(resources, resourceTags, numResources, p_params.color, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilPresent);
+        assignResource(resources, resourceTags, numResources, p_params.output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent);
+        assignResource(resources, resourceTags, numResources, p_params.depth, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilPresent);
+        assignResource(resources, resourceTags, numResources, p_params.velocity, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent);
+        //assignResource(resources, resourceTags, numResources, p_params.exposure, sl::kBufferTypeExposure, sl::ResourceLifecycle::eValidUntilPresent); // TODO: Passing in exposure makes things worse. Likely to be value incompatibility.
 
 		sl::Result result = StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nativeCmdlist);
         if (result != sl::Result::eOk)
@@ -356,16 +359,53 @@ void DLSSEffect::upscale(const Parameters &p_params) {
 		} 
 	}
 
-	// Evaluate DLSS Super Res
+	// Evaluate DLSS Super Resolution
 	if (context->currentDlssOptions.mode != sl::DLSSMode::eOff && context->delay == 0)
 	{
 		RD::get_singleton()->draw_command_begin_label("DLSS-SR");
 		const sl::BaseStructure *inputs[] = { &context->viewport };
-		void *nativeCmdlist = (void*)RD::get_singleton()->get_driver_resource(RenderingDevice::DriverResource::DRIVER_RESOURCE_VULKAN_COMMAND_BUFFER_DRAW);
 		sl::Result result = StreamlineContext::get().slEvaluateFeature(sl::kFeatureDLSS, *StreamlineContext::get().last_token, inputs, 1, nativeCmdlist);
 		if (result != sl::Result::eOk)
 			ERR_FAIL_MSG("Failed to call streamline slEvaluateFeature for DLSS Super Resolution. Result: " + String(StreamlineContext::result_to_string(result)));
 		RD::get_singleton()->draw_command_end_label();
+	}
+
+	// NIS support
+	// **********
+	if (p_params.sharpness > 0.0f && StreamlineContext::get().slNISSetOptions != nullptr)
+	{
+		// Set NIS settings
+        {
+            sl::NISOptions options;
+            options.hdrMode = sl::NISHDR::eNone;
+            options.mode = sl::NISMode::eSharpen;
+            options.sharpness = p_params.sharpness;
+            StreamlineContext::get().slNISSetOptions(context->viewport, options );
+        }
+
+        // Tag NIS buffers
+        {
+            sl::Resource resources[3];
+            sl::ResourceTag resourceTags[3];
+            int numResources = 0;
+
+            assignResource(resources, resourceTags, numResources, p_params.output, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eOnlyValidNow);
+			assignResource(resources, resourceTags, numResources, p_params.output, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent);
+
+			sl::Result result = StreamlineContext::get().slSetTag(context->viewport, resourceTags, numResources, nativeCmdlist);
+			if (result != sl::Result::eOk)
+				ERR_FAIL_MSG("Failed to call streamline slSetTag for NIS. Result: " + String(StreamlineContext::result_to_string(result)));
+        }
+
+        // Evaluate NIS
+        {
+            RD::get_singleton()->draw_command_begin_label("NIS");
+            const sl::BaseStructure *inputs[] = { &context->viewport };
+            sl::Result result = StreamlineContext::get().slEvaluateFeature(sl::kFeatureNIS, *StreamlineContext::get().last_token, inputs, 1, nativeCmdlist);
+			if (result != sl::Result::eOk)
+				ERR_FAIL_MSG("Failed to call streamline slEvaluateFeature for NIS. Result: " + String(StreamlineContext::result_to_string(result)));
+			RD::get_singleton()->draw_command_end_label();
+        }
 	}
 
 	// Reduce frame delay counter.

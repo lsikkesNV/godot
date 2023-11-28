@@ -5,6 +5,7 @@
 #include "../../thirdparty/streamline/include/sl_dlss.h"
 #include "../../thirdparty/streamline/include/sl_dlss_g.h"
 #include "../../thirdparty/streamline/include/sl_reflex.h"
+#include "../../thirdparty/streamline/include/sl_nis.h"
 
 class StreamlineContext
 {
@@ -38,6 +39,9 @@ public:
 	// DLSS Frame Generation
 	PFun_slDLSSGGetState *slDLSSGGetState = nullptr;
 	PFun_slDLSSGSetOptions *slDLSSGSetOptions = nullptr;
+
+	// NIS
+	PFun_slNISSetOptions *slNISSetOptions = nullptr;
 
 	void load_functions();
 	void load_functions_post_init();
@@ -91,7 +95,6 @@ void StreamlineContext::load_functions() {
 	this->slEvaluateFeature = (PFun_slEvaluateFeature *)GetProcAddress(streamline, "slEvaluateFeature");
 	this->slSetTag = (PFun_slSetTag *)GetProcAddress(streamline, "slSetTag");
 	this->slSetConstants = (PFun_slSetConstants *)GetProcAddress(streamline, "slSetConstants");
-
 #endif
 }
 
@@ -107,6 +110,8 @@ void StreamlineContext::load_functions_post_init() {
 
 	slGetFeatureFunction(sl::kFeatureDLSS_G, "slDLSSGGetState", (void *&)this->slDLSSGGetState);
 	slGetFeatureFunction(sl::kFeatureDLSS_G, "slDLSSGSetOptions", (void *&)this->slDLSSGSetOptions);
+
+	slGetFeatureFunction(sl::kFeatureNIS, "slNISSetOptions", (void *&)this->slNISSetOptions);
 }
 
 VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhysicalDevice device) {
@@ -117,6 +122,7 @@ VulkanContext::StreamlineCapabilities StreamlineContext::enumerate_support(VkPhy
 		support.dlssAvailable = this->slIsFeatureSupported(sl::kFeatureDLSS, adapterInfo) == sl::Result::eOk;
 		support.dlssGAvailable = this->slIsFeatureSupported(sl::kFeatureDLSS_G, adapterInfo) == sl::Result::eOk;
 		support.reflexAvailable = this->slIsFeatureSupported(sl::kFeatureReflex, adapterInfo) == sl::Result::eOk;
+		support.nisAvailable = this->slIsFeatureSupported(sl::kFeatureNIS, adapterInfo) == sl::Result::eOk;
 	}
 	return support;
 }
@@ -255,6 +261,7 @@ void VulkanContext::streamline_initialize() {
 
     Vector<sl::Feature> featuresToLoad;
 	featuresToLoad.push_back(sl::kFeatureDLSS);
+	featuresToLoad.push_back(sl::kFeatureNIS);
 	if(StreamlineContext::get().isGame)
 	{
 		featuresToLoad.push_back(sl::kFeatureDLSS_G);

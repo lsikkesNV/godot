@@ -100,6 +100,7 @@ public:
 		bool dlssAvailable = false;
 		bool dlssGAvailable = false;
 		bool reflexAvailable = false;
+		bool nisAvailable = false;
 	};
 
 private:
