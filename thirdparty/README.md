@@ -87,7 +87,7 @@ fix build with our own copy of zstd (patch in `patches`).
 ## brotli
 
 - Upstream: https://github.com/google/brotli
-- Version: git (ed1995b6bda19244070ab5d331111f16f67c8054, 2023)
+- Version: 1.1.0 (ed738e842d2fbdf2d6459e39267a633c4a9b2f5d, 2023)
 - License: MIT
 
 Files extracted from upstream source:
@@ -352,7 +352,7 @@ Files extracted from upstream source:
 ## harfbuzz
 
 - Upstream: https://github.com/harfbuzz/harfbuzz
-- Version: 8.1.1 (1d665c2b521512cdd56964138fc601debd1f1177, 2023)
+- Version: 8.2.2 (18a6e78549e8e04a281129ea8ca784ce85f111b8, 2023)
 - License: MIT
 
 Files extracted from upstream source:
@@ -493,7 +493,7 @@ in the MSVC debugger.
 ## mbedtls
 
 - Upstream: https://github.com/Mbed-TLS/mbedtls
-- Version: 2.28.4 (aeb97a18913a86f051afab11b2c92c6be0c2eb83, 2023)
+- Version: 2.28.5 (47e8cc9db2e469d902b0e3093ae9e482c3d87188, 2023)
 - License: Apache 2.0
 
 File extracted from upstream release tarball:
@@ -503,8 +503,8 @@ File extracted from upstream release tarball:
 - All `.c` and `.h` from `library/` to `thirdparty/mbedtls/library/` except
   those starting with `psa_*`
 - The `LICENSE` file
-- Applied the patch in `patches/windows-arm64-hardclock.diff`
-  Applied the patch in `aesni-no-arm-intrinsics.patch` to fix MSVC ARM build
+- Applied the patch `windows-arm64-hardclock.diff` to fix Windows ARM64 build
+  Applied the patch `windows-entropy-bcrypt.diff` to fix Windows Store support
 - Added 2 files `godot_core_mbedtls_platform.c` and `godot_core_mbedtls_config.h`
   providing configuration for light bundling with core
 - Added the file `godot_module_mbedtls_config.h` to customize the build
@@ -526,6 +526,25 @@ An [experimental upstream feature](https://github.com/zeux/meshoptimizer/tree/si
 has been backported. On top of that, it was modified to report only distance
 error metrics instead of a combination of distance and attribute errors. Patches
 for both changes can be found in the `patches` directory.
+
+
+## mingw-std-threads
+
+- Upstream: https://github.com/meganz/mingw-std-threads
+- Version: git (c931bac289dd431f1dd30fc4a5d1a7be36668073, 2023)
+- License: BSD-2-clause
+
+Files extracted from upstream repository:
+
+- `LICENSE`
+- `mingw.condition_variable.h`
+- `mingw.invoke.h`
+- `mingw.mutex.h`
+- `mingw.shared_mutex.h`
+- `mingw.thread.h`
+
+Once copied, apply `godot.patch` (needed because Godot is built without exceptions
+and to avoid std:: replacements leak in Clang builds).
 
 
 ## minimp3
@@ -623,7 +642,7 @@ Collection of single-file libraries used in Godot components.
   * License: MIT
 - `r128.{c,h}`
   * Upstream: https://github.com/fahickman/r128
-  * Version: 1.4.4 (cf2e88fc3e7d7dfe99189686f914874cd0bda15e, 2020)
+  * Version: git (6fc177671c47640d5bb69af10cf4ee91050015a1, 2023)
   * License: Public Domain or Unlicense
 - `smaz.{c,h}`
   * Upstream: https://github.com/antirez/smaz
@@ -685,7 +704,7 @@ with the provided patch.
 ## openxr
 
 - Upstream: https://github.com/KhronosGroup/OpenXR-SDK
-- Version: 1.0.30 (55224479ab13db8ebc8ab1e3d49197bce6201b0b, 2023)
+- Version: 1.0.31 (95fe35ffb383710a6e0567e958ead9a3b66e930c, 2023)
 - License: Apache 2.0
 
 Files extracted from upstream source:
@@ -702,6 +721,7 @@ Files extracted from upstream source:
 Exclude:
 
 - `src/external/android-jni-wrappers` and `src/external/jnipp` (not used yet)
+- Obsolete `src/xr_generated_dispatch_table.{c,h}`
 - All CMake stuff: `cmake/`, `CMakeLists.txt` and `*.cmake`
 - All Gradle stuff: `*gradle*`, `AndroidManifest.xml`
 - All following files (and their `.license` files):

@@ -536,8 +536,11 @@ class Godot(private val context: Context) : SensorEventListener {
 		for (plugin in pluginRegistry.allPlugins) {
 			plugin.onMainDestroy()
 		}
-		GodotLib.ondestroy()
-		forceQuit()
+
+		runOnRenderThread {
+			GodotLib.ondestroy()
+			forceQuit()
+		}
 	}
 
 	/**
@@ -906,7 +909,7 @@ class Godot(private val context: Context) : SensorEventListener {
 				val arg = ByteArray(strlen)
 				r = inputStream.read(arg)
 				if (r == strlen) {
-					cmdline[i] = String(arg, StandardCharsets.UTF_8)
+					cmdline.add(String(arg, StandardCharsets.UTF_8))
 				}
 			}
 			cmdline
